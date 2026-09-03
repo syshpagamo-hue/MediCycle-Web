@@ -1,34 +1,29 @@
-# MediCycle-Web
+# MediCycle Web
 
-React + TypeScript + Vite project scaffold.
+MediCycle AI is a React + TypeScript + Vite prototype for medicine recognition, safe disposal guidance, and ocean-impact learning.
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## Current prototype scope
 
-Currently, two official plugins are available:
+- Front-end-only mock medicine analysis
+- Local image preview; selected photos are not uploaded
+- Disposal guidance and nearby-pharmacy discovery
+- Marine life collection with progress stored in `localStorage`
+- Two-question environmental impact check
+- Static output compatible with Cloudflare Pages
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The current build does not include YOLO inference, Next.js, a Worker API, Drizzle, or a database.
 
-## React Compiler
+## Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Production build
+
+```bash
+npm run build
+```
+
+Cloudflare Pages output directory: `dist`
