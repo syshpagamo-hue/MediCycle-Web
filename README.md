@@ -11,7 +11,18 @@ MediCycle AI is a React + TypeScript + Vite prototype for medicine recognition, 
 - Two-question environmental impact check
 - Static output compatible with Cloudflare Pages
 
-The current build does not include YOLO inference, Next.js, a Worker API, Drizzle, or a database.
+The current repository does not include the trained YOLO model, Next.js, a
+Worker API, Drizzle, or a database.
+
+## Browser ONNX inference
+
+The browser-side YOLO11 pipeline is implemented with `onnxruntime-web`. Add the
+model as `public/models/best.onnx` and, optionally, class names as
+`public/models/classes.json`. See `public/models/README.md` for the expected
+input and output formats.
+
+Detection overlays are intentionally independent from the mock disposal,
+collection, and quiz flow until the trained model has been validated.
 
 ## Development
 

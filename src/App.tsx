@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import './App.css'
+import { DetectionPreview } from './DetectionPreview'
 import {
   ActivityBanner,
   HeroArtwork,
@@ -25,6 +26,13 @@ import {
   type PageName,
   type Pharmacy,
 } from './data'
+import {
+  ModelUnavailableError,
+  runYoloInference,
+  type Detection,
+  type InferenceBackend,
+  type InferenceStage,
+} from './inference/yolo'
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const toRad = (value: number) => (value * Math.PI) / 180
@@ -89,6 +97,11 @@ function App() {
   const [recycledForResult, setRecycledForResult] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState({ disposal: '', consequence: '' })
   const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [detections, setDetections] = useState<Detection[]>([])
+  const [inferenceStatus, setInferenceStatus] = useState<'idle' | InferenceStage | 'success' | 'error'>('idle')
+  const [inferenceBackend, setInferenceBackend] = useState<InferenceBackend | null>(null)
+  const [inferenceMs, setInferenceMs] = useState(0)
+  const [inferenceError, setInferenceError] = useState('')
 
   useEffect(() => {
     const onPopState = () => {
@@ -119,6 +132,41 @@ function App() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [unlockedCard])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!file) return
+
+    runYoloInference(file, {
+      confidenceThreshold: 0.25,
+      iouThreshold: 0.45,
+      onStage: (stage) => {
+        if (!cancelled) setInferenceStatus(stage)
+      },
+    })
+      .then((inference) => {
+        if (cancelled) return
+        setDetections(inference.detections)
+        setInferenceBackend(inference.backend)
+        setInferenceMs(inference.inferenceMs)
+        setInferenceStatus('success')
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setInferenceError(
+          error instanceof ModelUnavailableError
+            ? 'Model not installed yet. Add public/models/best.onnx.'
+            : error instanceof Error
+              ? error.message
+              : 'Browser inference could not be completed.',
+        )
+        setInferenceStatus('error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [file])
 
   const navigate = (nextPage: PageName) => {
     if (nextPage === 'result' && !result) return
@@ -161,6 +209,11 @@ function App() {
       return
     }
     if (preview) URL.revokeObjectURL(preview)
+    setDetections([])
+    setInferenceStatus('loading-model')
+    setInferenceBackend(null)
+    setInferenceMs(0)
+    setInferenceError('')
     setFile(selected)
     setPreview(URL.createObjectURL(selected))
     resetAnalysisState()
@@ -187,6 +240,11 @@ function App() {
     if (preview) URL.revokeObjectURL(preview)
     setFile(null)
     setPreview(null)
+    setDetections([])
+    setInferenceStatus('idle')
+    setInferenceBackend(null)
+    setInferenceMs(0)
+    setInferenceError('')
     resetAnalysisState()
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -386,7 +444,7 @@ function App() {
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={dropFile}
               >
-                {preview ? <img src={preview} alt="Selected medicine preview" /> : (
+                {preview ? <DetectionPreview src={preview} alt="Selected medicine preview" detections={detections} /> : (
                   <div className="upload-empty">
                     <span aria-hidden="true">+</span>
                     <p>Drop a medicine photo here</p>
@@ -394,6 +452,21 @@ function App() {
                   </div>
                 )}
               </div>
+              {file && (
+                <div className={`inference-status is-${inferenceStatus}`} aria-live="polite">
+                  <span aria-hidden="true" />
+                  <div>
+                    <b>Browser YOLO11</b>
+                    <small>
+                      {inferenceStatus === 'loading-model' && 'Loading ONNX model…'}
+                      {inferenceStatus === 'preprocessing' && 'Resizing and normalizing image…'}
+                      {inferenceStatus === 'running' && 'Running on-device inference…'}
+                      {inferenceStatus === 'success' && `${detections.length} detection${detections.length === 1 ? '' : 's'} · ${inferenceBackend === 'webgpu' ? 'WebGPU' : 'WASM'} · ${Math.round(inferenceMs)} ms`}
+                      {inferenceStatus === 'error' && inferenceError}
+                    </small>
+                  </div>
+                </div>
+              )}
               {file && (
                 <div className="file-summary" aria-live="polite">
                   <div><span aria-hidden="true">✓</span><p><b>Photo ready</b><small>{file.name}</small></p></div>
@@ -455,7 +528,7 @@ function App() {
           <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>← NEW SCAN</button><span>ANALYSIS COMPLETE · MOCK RESULT</span></div>
           <ProcessSteps active={recycledForResult ? 4 : 2} />
           <section className="result-hero" aria-live="polite">
-            <div className="result-image">{preview && <img src={preview} alt="Analyzed medicine" />}</div>
+            <div className="result-image">{preview && <DetectionPreview src={preview} alt="Analyzed medicine" detections={detections} />}</div>
             <div className="result-summary">
               <p className="eyebrow">AI-ASSISTED DEMO MATCH</p>
               <h1>{result.drugName}</h1><p className="category-line">{result.category}</p>
