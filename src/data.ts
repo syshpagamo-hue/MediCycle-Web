@@ -28,6 +28,92 @@ export type LocatorState =
   | 'network-error'
   | 'empty'
 
+export type QuizOption = {
+  id: 'A' | 'B' | 'C' | 'D'
+  text: string
+}
+
+export type QuizQuestion = {
+  id: string
+  question: string
+  options: QuizOption[]
+  correctOptionId: QuizOption['id']
+}
+
+export const quizQuestions: QuizQuestion[] = [
+  {
+    id: 'ee2-marine-fish-impact',
+    question:
+      'What impact does ethinyl estradiol (EE2), a common component of oral contraceptives, have on marine fish like clownfish when it enters water bodies?',
+    options: [
+      {
+        id: 'A',
+        text: 'It induces feminization in male fish, affects sperm/egg development, alters behavior, and may lead to population collapse.',
+      },
+      { id: 'B', text: 'It causes fish to grow abnormally large.' },
+      { id: 'C', text: 'It damages fish gills, causing immediate suffocation.' },
+      { id: 'D', text: 'It changes fish scale colors to help them escape predators.' },
+    ],
+    correctOptionId: 'A',
+  },
+  {
+    id: 'medication-path-to-ocean',
+    question:
+      'How do waste medications used by humans (such as birth control pills, antidepressants, and painkillers) mainly enter the ocean to disrupt coral reefs and marine life?',
+    options: [
+      { id: 'A', text: 'High-temperature exhaust gas directly emitted by factories' },
+      { id: 'B', text: 'Plastic garbage dumped at sea by ships' },
+      { id: 'C', text: 'Household wastewater and improper drug disposal' },
+      { id: 'D', text: 'Chemical substances released by underwater volcanic eruptions' },
+    ],
+    correctOptionId: 'C',
+  },
+  {
+    id: 'importance-of-proper-disposal',
+    question: 'Why is proper medication disposal important?',
+    options: [
+      { id: 'A', text: 'It protects the environment.' },
+      { id: 'B', text: "It changes the medicine's color." },
+      { id: 'C', text: 'It makes medicine cheaper.' },
+      { id: 'D', text: 'It increases plastic recycling.' },
+    ],
+    correctOptionId: 'A',
+  },
+  {
+    id: 'hormone-medication-disposal',
+    question: 'Where should hormone medications be disposed of?',
+    options: [
+      { id: 'A', text: 'Household trash' },
+      { id: 'B', text: 'Flush them down the toilet' },
+      { id: 'C', text: 'A designated pharmacy or medical collection point' },
+      { id: 'D', text: 'Recycling bin' },
+    ],
+    correctOptionId: 'C',
+  },
+  {
+    id: 'marine-animal-water-pollution',
+    question: 'Which marine animal is most affected by water pollution?',
+    options: [
+      { id: 'A', text: 'Sea turtle' },
+      { id: 'B', text: 'Eagle' },
+      { id: 'C', text: 'Panda' },
+      { id: 'D', text: 'Butterfly' },
+    ],
+    correctOptionId: 'A',
+  },
+  {
+    id: 'ai-system-role',
+    question: 'What does AI help our system do?',
+    options: [
+      { id: 'A', text: 'Identify medications' },
+      { id: 'B', text: 'Produce medicine' },
+      { id: 'C', text: 'Deliver medicine' },
+      { id: 'D', text: 'Sell medicine' },
+    ],
+    correctOptionId: 'A',
+  },
+]
+
 export const fixedDemoCase: AnalysisResult = {
   drugName: 'Ethinyl Estradiol 0.03 mg',
   category: 'Fixed demonstration case | Hormonal medication',

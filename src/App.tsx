@@ -7,6 +7,7 @@ import {
 } from 'react'
 import './App.css'
 import { DetectionPreview } from './DetectionPreview'
+import { Quiz } from './Quiz'
 import {
   ActivityBanner,
   HeroArtwork,
@@ -114,8 +115,6 @@ function App() {
   const [recycledCount, setRecycledCount] = useState(getStoredProgress)
   const [recycledForResult, setRecycledForResult] = useState(false)
   const [returnPlanConfirmed, setReturnPlanConfirmed] = useState(false)
-  const [quizAnswers, setQuizAnswers] = useState({ disposal: '', consequence: '' })
-  const [quizSubmitted, setQuizSubmitted] = useState(false)
   const [sessionEnded, setSessionEnded] = useState(
     () => window.location.hash === pageHash.result,
   )
@@ -250,8 +249,6 @@ function App() {
   const resetAnalysisState = () => {
     setResult(null)
     setRecycledForResult(false)
-    setQuizAnswers({ disposal: '', consequence: '' })
-    setQuizSubmitted(false)
     setLocatorState('idle')
     setPharmacies([])
     setReturnPlanConfirmed(false)
@@ -331,8 +328,6 @@ function App() {
     const demoResult = { ...fixedDemoCase, steps: [...fixedDemoCase.steps] }
     setResult(demoResult)
     setRecycledForResult(false)
-    setQuizAnswers({ disposal: '', consequence: '' })
-    setQuizSubmitted(false)
     setIsAnalyzing(false)
     window.history.pushState({ page: 'result' }, '', pageHash.result)
     setPage('result')
@@ -466,14 +461,8 @@ function App() {
     setRecycledForResult(false)
     setReturnPlanConfirmed(false)
     setUnlockedCard(null)
-    setQuizAnswers({ disposal: '', consequence: '' })
-    setQuizSubmitted(false)
     showToast('MediCycle demo progress has been reset.')
   }
-
-  const quizScore =
-    Number(quizAnswers.disposal === 'return') +
-    Number(quizAnswers.consequence === 'waterways')
 
   const pharmacySection = (
     <section className="pharmacy-section" id="nearest-pharmacy" aria-label="Nearby pharmacies">
@@ -745,36 +734,7 @@ function App() {
             </button>
           </div>
 
-          {recycledForResult && (
-            <section className="knowledge-check" id="impact-check" aria-labelledby="quiz-title">
-              <div className="knowledge-intro">
-                <p className="eyebrow">STEP 04 · EMPATHY-BASED LEARNING</p><h2 id="quiz-title">Turn awareness into knowledge.</h2>
-                <p>This two-question impact check measures whether the journey improved understanding of safe disposal and ecological consequences.</p>
-                <div className="theory-note"><b>NAM · Awareness of Consequences</b><span>Understanding impact can activate a personal norm for pro-environmental action.</span></div>
-              </div>
-              <form onSubmit={(event) => { event.preventDefault(); setQuizSubmitted(true) }}>
-                <fieldset>
-                  <legend>01 · What is the safest next step for unused hormone medication?</legend>
-                  <label><input type="radio" name="disposal" value="trash" checked={quizAnswers.disposal === 'trash'} onChange={(event) => { setQuizAnswers({ ...quizAnswers, disposal: event.target.value }); setQuizSubmitted(false) }} /> Put it directly in household trash</label>
-                  <label><input type="radio" name="disposal" value="flush" checked={quizAnswers.disposal === 'flush'} onChange={(event) => { setQuizAnswers({ ...quizAnswers, disposal: event.target.value }); setQuizSubmitted(false) }} /> Flush it down a sink or toilet</label>
-                  <label><input type="radio" name="disposal" value="return" checked={quizAnswers.disposal === 'return'} onChange={(event) => { setQuizAnswers({ ...quizAnswers, disposal: event.target.value }); setQuizSubmitted(false) }} /> Return it to a medical institution or confirmed collection point</label>
-                </fieldset>
-                <fieldset>
-                  <legend>02 · Why should medicine never be flushed?</legend>
-                  <label><input type="radio" name="consequence" value="appearance" checked={quizAnswers.consequence === 'appearance'} onChange={(event) => { setQuizAnswers({ ...quizAnswers, consequence: event.target.value }); setQuizSubmitted(false) }} /> It may change the color of the packaging</label>
-                  <label><input type="radio" name="consequence" value="waterways" checked={quizAnswers.consequence === 'waterways'} onChange={(event) => { setQuizAnswers({ ...quizAnswers, consequence: event.target.value }); setQuizSubmitted(false) }} /> Active ingredients can enter waterways and affect aquatic life</label>
-                  <label><input type="radio" name="consequence" value="cost" checked={quizAnswers.consequence === 'cost'} onChange={(event) => { setQuizAnswers({ ...quizAnswers, consequence: event.target.value }); setQuizSubmitted(false) }} /> It makes future medicine more expensive</label>
-                </fieldset>
-                <button className="figma-button black" type="submit" disabled={!quizAnswers.disposal || !quizAnswers.consequence}>CHECK MY UNDERSTANDING</button>
-                {quizSubmitted && (
-                  <div className={`quiz-feedback${quizScore === 2 ? ' is-correct' : ''}`} role="status">
-                    <b>{quizScore === 2 ? '2 / 2 · Knowledge activated' : `${quizScore} / 2 · Review and try again`}</b>
-                    <p>{quizScore === 2 ? 'You connected the disposal action with its environmental consequence.' : 'Look again at the disposal plan and the ocean impact explanation above.'}</p>
-                  </div>
-                )}
-              </form>
-            </section>
-          )}
+          {recycledForResult && <Quiz />}
         </div>
       )}
 
