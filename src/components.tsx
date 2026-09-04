@@ -59,7 +59,7 @@ export function HeroArtwork({ onScan }: { onScan: () => void }) {
         <p>Turn one photo into disposal confidence, a safer next step, and an engaging journey toward ocean responsibility.</p>
         <button className="figma-button black" type="button" onClick={onScan}>SCAN A MEDICINE</button>
       </div>
-      <div className="hero-status"><span aria-hidden="true" /> Static prototype · Mock analysis</div>
+      <div className="hero-status"><span aria-hidden="true" /> Demo mode · Fixed case</div>
     </section>
   )
 }
@@ -82,12 +82,12 @@ export function ActivityBanner({ onOpen }: { onOpen?: () => void }) {
   )
 }
 
-export function ProcessSteps({ active = 1 }: { active?: 1 | 2 | 3 | 4 }) {
+export function ProcessSteps({ active = 0 }: { active?: 0 | 1 | 2 | 3 | 4 }) {
   const steps = [
-    ['01', 'Detect', 'Upload a medicine photo for visual analysis'],
-    ['02', 'Guide', 'Build confidence with disposal guidance'],
-    ['03', 'Reward', 'Unlock a marine life card'],
-    ['04', 'Learn', 'Complete an empathy-based impact check'],
+    ['01', 'View guidance', 'Open the fixed demonstration case'],
+    ['02', 'Plan a return', 'Find and contact a nearby pharmacy'],
+    ['03', 'Demo completion', 'Simulate the real-world hand-off'],
+    ['04', 'Unlock', 'Reveal a marine life card'],
   ]
 
   return (
@@ -103,10 +103,12 @@ export function ProcessSteps({ active = 1 }: { active?: 1 | 2 | 3 | 4 }) {
 }
 
 export function SectionHeading({
+  id,
   eyebrow,
   title,
   text,
 }: {
+  id?: string
   eyebrow: string
   title: string
   text?: string
@@ -114,7 +116,7 @@ export function SectionHeading({
   return (
     <div className="section-heading">
       <p className="eyebrow">{eyebrow}</p>
-      <h2>{title}</h2>
+      <h2 id={id}>{title}</h2>
       {text && <p className="section-intro">{text}</p>}
     </div>
   )

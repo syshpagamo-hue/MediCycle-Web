@@ -30,6 +30,7 @@ Without this file, overlays use `Class 0`, `Class 1`, and so on. If the exported
 model includes a separate objectness score (YOLOv5-style output), pass
 `hasObjectness: true` to `runYoloInference`.
 
-The existing disposal recommendation, collection unlock, and quiz continue to
-use independent mock data until the product flow is intentionally connected to
-validated model classes.
+The current UI is explicitly in Demo Mode and does not invoke this pipeline.
+Its disposal recommendation, return plan, collection unlock, and quiz use one
+fixed, clearly labeled demonstration case until the model and class-to-guidance
+mapping have been validated.

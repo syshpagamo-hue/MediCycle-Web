@@ -4,7 +4,6 @@ import {
   useState,
   type ChangeEvent,
   type DragEvent,
-  type KeyboardEvent,
 } from 'react'
 import './App.css'
 import { DetectionPreview } from './DetectionPreview'
@@ -19,20 +18,16 @@ import {
   fallbackPharmacies,
   marineCards,
   marineFacts,
-  mockAnalysis,
+  fixedDemoCase,
   pageHash,
   type AnalysisResult,
   type LocatorState,
   type PageName,
   type Pharmacy,
 } from './data'
-import {
-  ModelUnavailableError,
-  runYoloInference,
-  type Detection,
-  type InferenceBackend,
-  type InferenceStage,
-} from './inference/yolo'
+
+const DEMO_PROGRESS_KEY = 'medicycle-demo-recycled-count'
+const LEGACY_PROGRESS_KEY = 'medicine-recycled'
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const toRad = (value: number) => (value * Math.PI) / 180
@@ -74,18 +69,28 @@ function addressFromTags(tags: Record<string, string>) {
 }
 
 function getStoredProgress() {
-  const stored = Number(window.localStorage.getItem('medicine-recycled') || 0)
-  return Number.isFinite(stored)
-    ? Math.min(Math.max(Math.floor(stored), 0), marineCards.length)
-    : 0
+  try {
+    const storedValue =
+      window.localStorage.getItem(DEMO_PROGRESS_KEY) ??
+      window.localStorage.getItem(LEGACY_PROGRESS_KEY) ??
+      '0'
+    const stored = Number(storedValue)
+    return Number.isFinite(stored)
+      ? Math.min(Math.max(Math.floor(stored), 0), marineCards.length)
+      : 0
+  } catch {
+    return 0
+  }
 }
 
 function App() {
-  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const uploadRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLElement>(null)
   const [page, setPage] = useState<PageName>('home')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [captureSource, setCaptureSource] = useState<'camera' | 'upload' | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -95,13 +100,9 @@ function App() {
   const [unlockedCard, setUnlockedCard] = useState<(typeof marineCards)[number] | null>(null)
   const [recycledCount, setRecycledCount] = useState(getStoredProgress)
   const [recycledForResult, setRecycledForResult] = useState(false)
+  const [returnPlanConfirmed, setReturnPlanConfirmed] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState({ disposal: '', consequence: '' })
   const [quizSubmitted, setQuizSubmitted] = useState(false)
-  const [detections, setDetections] = useState<Detection[]>([])
-  const [inferenceStatus, setInferenceStatus] = useState<'idle' | InferenceStage | 'success' | 'error'>('idle')
-  const [inferenceBackend, setInferenceBackend] = useState<InferenceBackend | null>(null)
-  const [inferenceMs, setInferenceMs] = useState(0)
-  const [inferenceError, setInferenceError] = useState('')
 
   useEffect(() => {
     const onPopState = () => {
@@ -133,41 +134,6 @@ function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [unlockedCard])
 
-  useEffect(() => {
-    let cancelled = false
-    if (!file) return
-
-    runYoloInference(file, {
-      confidenceThreshold: 0.25,
-      iouThreshold: 0.45,
-      onStage: (stage) => {
-        if (!cancelled) setInferenceStatus(stage)
-      },
-    })
-      .then((inference) => {
-        if (cancelled) return
-        setDetections(inference.detections)
-        setInferenceBackend(inference.backend)
-        setInferenceMs(inference.inferenceMs)
-        setInferenceStatus('success')
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return
-        setInferenceError(
-          error instanceof ModelUnavailableError
-            ? 'Model not installed yet. Add public/models/best.onnx.'
-            : error instanceof Error
-              ? error.message
-              : 'Browser inference could not be completed.',
-        )
-        setInferenceStatus('error')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [file])
-
   const navigate = (nextPage: PageName) => {
     if (nextPage === 'result' && !result) return
     window.history.pushState({ page: nextPage }, '', pageHash[nextPage])
@@ -197,9 +163,10 @@ function App() {
     setQuizSubmitted(false)
     setLocatorState('idle')
     setPharmacies([])
+    setReturnPlanConfirmed(false)
   }
 
-  const acceptFile = (selected?: File) => {
+  const acceptFile = (selected: File | undefined, source: 'camera' | 'upload') => {
     if (!selected || !selected.type.startsWith('image/')) {
       showToast('Please choose a JPG, PNG, or HEIC medicine photo.')
       return
@@ -209,55 +176,37 @@ function App() {
       return
     }
     if (preview) URL.revokeObjectURL(preview)
-    setDetections([])
-    setInferenceStatus('loading-model')
-    setInferenceBackend(null)
-    setInferenceMs(0)
-    setInferenceError('')
     setFile(selected)
     setPreview(URL.createObjectURL(selected))
+    setCaptureSource(source)
     resetAnalysisState()
   }
 
-  const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
-    acceptFile(event.target.files?.[0])
+  const selectFile = (source: 'camera' | 'upload') => (event: ChangeEvent<HTMLInputElement>) => {
+    acceptFile(event.target.files?.[0], source)
   }
 
   const dropFile = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     setIsDragging(false)
-    acceptFile(event.dataTransfer.files?.[0])
-  }
-
-  const openFilePickerFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      fileRef.current?.click()
-    }
+    acceptFile(event.dataTransfer.files?.[0], 'upload')
   }
 
   const removeFile = () => {
     if (preview) URL.revokeObjectURL(preview)
     setFile(null)
     setPreview(null)
-    setDetections([])
-    setInferenceStatus('idle')
-    setInferenceBackend(null)
-    setInferenceMs(0)
-    setInferenceError('')
+    setCaptureSource(null)
     resetAnalysisState()
-    if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (uploadRef.current) uploadRef.current.value = ''
   }
 
-  const analyze = async () => {
-    if (!file) {
-      fileRef.current?.click()
-      return
-    }
+  const openFixedDemoCase = async () => {
     setIsAnalyzing(true)
-    await new Promise((resolve) => window.setTimeout(resolve, 900))
-    const mockResult = { ...mockAnalysis, steps: [...mockAnalysis.steps] }
-    setResult(mockResult)
+    await new Promise((resolve) => window.setTimeout(resolve, 450))
+    const demoResult = { ...fixedDemoCase, steps: [...fixedDemoCase.steps] }
+    setResult(demoResult)
     setRecycledForResult(false)
     setQuizAnswers({ disposal: '', consequence: '' })
     setQuizSubmitted(false)
@@ -267,11 +216,13 @@ function App() {
   }
 
   const showFallbackLocation = (lat = 24.1795, lon = 120.6465) => {
+    setReturnPlanConfirmed(false)
     setPharmacies(sortByDistance(fallbackPharmacies, lat, lon))
     setLocatorState('fallback')
   }
 
   const locatePharmacies = () => {
+    setReturnPlanConfirmed(false)
     if (!navigator.geolocation) {
       showFallbackLocation()
       return
@@ -309,6 +260,7 @@ function App() {
                 lon,
                 address: addressFromTags(tags),
                 phone: tags.phone,
+                takeBackStatus: 'unverified',
               }
             })
             .filter((item): item is Omit<Pharmacy, 'distance'> => item !== null)
@@ -328,12 +280,38 @@ function App() {
   }
 
   const markAsRecycled = () => {
-    if (recycledForResult) return
+    if (recycledForResult || !returnPlanConfirmed) return
     const next = Math.min(recycledCount + 1, marineCards.length)
     setRecycledCount(next)
     setRecycledForResult(true)
-    window.localStorage.setItem('medicine-recycled', String(next))
+    try {
+      window.localStorage.setItem(DEMO_PROGRESS_KEY, String(next))
+      window.localStorage.removeItem(LEGACY_PROGRESS_KEY)
+    } catch {
+      showToast('Progress could not be saved on this device.')
+    }
     setUnlockedCard(marineCards[Math.max(0, next - 1)])
+  }
+
+  const resetDemoProgress = () => {
+    const confirmed = window.confirm(
+      'Reset MediCycle demo progress? This only removes MediCycle demo collection data from this browser.',
+    )
+    if (!confirmed) return
+    try {
+      window.localStorage.removeItem(DEMO_PROGRESS_KEY)
+      window.localStorage.removeItem(LEGACY_PROGRESS_KEY)
+    } catch {
+      showToast('Demo progress could not be cleared on this device.')
+      return
+    }
+    setRecycledCount(0)
+    setRecycledForResult(false)
+    setReturnPlanConfirmed(false)
+    setUnlockedCard(null)
+    setQuizAnswers({ disposal: '', consequence: '' })
+    setQuizSubmitted(false)
+    showToast('MediCycle demo progress has been reset.')
   }
 
   const quizScore =
@@ -341,28 +319,33 @@ function App() {
     Number(quizAnswers.consequence === 'waterways')
 
   const pharmacySection = (
-    <section className="pharmacy-section" id="nearest-pharmacy" aria-label="Nearest medicine return options">
+    <section className="pharmacy-section" id="nearest-pharmacy" aria-label="Nearby pharmacies">
       <div className="pharmacy-heading-row">
         <SectionHeading
-          eyebrow="ACTION SUPPORT · NEAREST RETURN OPTION"
-          title="Complete the journey nearby."
-          text="Find pharmacies within approximately 3.5 km, sorted by distance. Call before visiting to confirm that the location accepts returned medication."
+          eyebrow="ACTION SUPPORT · PLAN A RETURN OPTION"
+          title="Nearby pharmacies."
+          text="These are nearby pharmacies, not verified medication return points. Contact the pharmacy to confirm medication take-back availability before visiting."
         />
         <div className="privacy-chip"><span aria-hidden="true" /> Location stays in your browser</div>
       </div>
-      <button
-        type="button"
-        className="figma-button black"
-        onClick={locatePharmacies}
-        disabled={locatorState === 'locating'}
-      >
-        {locatorState === 'locating' ? 'FINDING PHARMACIES…' : 'USE MY CURRENT LOCATION'}
-      </button>
+      <div className="pharmacy-entry-actions">
+        <button
+          type="button"
+          className="figma-button black"
+          onClick={locatePharmacies}
+          disabled={locatorState === 'locating'}
+        >
+          {locatorState === 'locating' ? 'FINDING PHARMACIES…' : 'USE MY CURRENT LOCATION'}
+        </button>
+        <button type="button" className="figma-button outline" onClick={() => showFallbackLocation()}>
+          VIEW SAMPLE PHARMACIES
+        </button>
+      </div>
       {locatorState === 'locating' && (
         <p className="location-note" role="status">Allow location access when your browser asks. This usually takes a few seconds.</p>
       )}
       {locatorState === 'ready' && (
-        <p className="location-note" role="status">Live map results · sorted by straight-line distance</p>
+        <p className="location-note" role="status">Live pharmacy results · take-back availability is not verified</p>
       )}
       {locatorState === 'fallback' && (
         <p className="location-note demo-note" role="status"><b>DEMO DATA</b> Showing sample pharmacies near Xitun District, Taichung.</p>
@@ -381,7 +364,11 @@ function App() {
               <div className="pharmacy-copy">
                 <h3>{pharmacy.name}</h3>
                 <p>{pharmacy.address}</p>
-                <small>Confirm medication-return service before your visit.</small>
+                <small className={`verification-label is-${pharmacy.takeBackStatus}`}>
+                  {pharmacy.takeBackStatus === 'verified'
+                    ? 'VERIFIED RETURN POINT'
+                    : 'UNVERIFIED · CONTACT THE PHARMACY TO CONFIRM MEDICATION TAKE-BACK AVAILABILITY'}
+                </small>
               </div>
               <div className="pharmacy-actions">
                 <strong>{pharmacy.distance < 1 ? `${Math.round(pharmacy.distance * 1000)} m` : `${pharmacy.distance.toFixed(1)} km`}</strong>
@@ -392,7 +379,23 @@ function App() {
               </div>
             </article>
           ))}
-          <p className="data-source">Pharmacy locations are retrieved from open map data. Acceptance of returned medicine is not guaranteed.</p>
+          <p className="data-source">Locations come from open map data. This version does not yet include a verified return-point data source.</p>
+          {page === 'result' && (
+            <div className="return-plan-action">
+              <div>
+                <b>{returnPlanConfirmed ? 'Return option planned' : 'Next: make a contact plan'}</b>
+                <p>Choose a pharmacy you can contact to confirm medication take-back availability.</p>
+              </div>
+              <button
+                type="button"
+                className={`figma-button ${returnPlanConfirmed ? 'gray' : 'black'}`}
+                onClick={() => setReturnPlanConfirmed(true)}
+                disabled={returnPlanConfirmed}
+              >
+                {returnPlanConfirmed ? '✓ PLAN RECORDED' : 'I WILL CONTACT A PHARMACY'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -407,76 +410,67 @@ function App() {
           <HeroArtwork onScan={() => goToSection('scan')} />
 
           <section className="value-strip" aria-label="Product value">
-            <div><span>26</span><p><b>Medicine classes</b><small>In the team&apos;s current image database</small></p></div>
-            <div><span>93.5%+</span><p><b>Test accuracy</b><small>Reported for the trained classification model</small></p></div>
-            <div><span>≈4K</span><p><b>Scale-up vision</b><small>Future expansion using NLM RxIMAGE</small></p></div>
-            <div><span>500</span><p><b>Interaction goal</b><small>Valid identification journeys targeted</small></p></div>
+            <div><span>1</span><p><b>Fixed demo case</b><small>Ethinyl estradiol disposal journey</small></p></div>
+            <div><span>LOCAL</span><p><b>Private preview</b><small>Selected photos stay on this device</small></p></div>
+            <div><span>4</span><p><b>Guided steps</b><small>Guidance, planning, simulation, reward</small></p></div>
+            <div><span>6</span><p><b>Marine stories</b><small>Ocean impact collection</small></p></div>
           </section>
 
           <section className="scan-section" id="scan" aria-labelledby="scan-title">
             <div className="scan-intro">
               <SectionHeading
+                id="scan-title"
                 eyebrow="START HERE"
-                title="One photo. A clearer next step."
-                text="Photograph the medicine or packaging in good light. MediCycle AI uses visual recognition to lower the knowledge barrier that often prevents people from disposing of medicine correctly."
+                title="Preview a photo. Explore one fixed case."
+                text="Take or upload a photo to try the mobile-first preview. This prototype does not identify the photo; the next screen always uses the clearly labeled Ethinyl Estradiol demonstration case."
               />
-              <ProcessSteps active={file ? 2 : 1} />
+              <ProcessSteps active={0} />
               <div className="prototype-note">
-                <b>Transparent prototype scope</b>
-                <p>This static demo simulates AI analysis with front-end mock data. Your photo stays on this device and is not uploaded or stored.</p>
+                <b>Demo Mode · No live AI recognition</b>
+                <p>Your photo is only previewed locally and never changes the fixed demonstration result. A validated model can be connected in a future version.</p>
               </div>
             </div>
 
             <div className="upload-panel">
               <div className="upload-panel-head">
-                <div><span className="status-dot" aria-hidden="true" /> MOCK IMAGE ANALYSIS</div>
+                <div><span className="status-dot" aria-hidden="true" /> DEMO MODE · PREVIEW ONLY</div>
                 <small>JPG · PNG · HEIC · MAX 10 MB</small>
               </div>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" hidden onChange={selectFile} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={selectFile('camera')} />
+              <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif" hidden onChange={selectFile('upload')} />
+              <div className="photo-entry-actions" aria-label="Choose how to add a photo">
+                <button type="button" className="figma-button black" onClick={() => cameraRef.current?.click()}>
+                  {captureSource === 'camera' && file ? 'RETAKE PHOTO' : 'TAKE A PHOTO'}
+                </button>
+                <button type="button" className="figma-button outline" onClick={() => uploadRef.current?.click()}>
+                  {captureSource === 'upload' && file ? 'REPLACE PHOTO' : 'UPLOAD FROM DEVICE'}
+                </button>
+              </div>
+              <p className="camera-fallback-note">Camera unavailable or permission declined? Use <b>Upload from device</b> instead.</p>
               <div
                 className={`photo-picker${isDragging ? ' is-dragging' : ''}${preview ? ' has-photo' : ''}`}
-                role="button"
-                tabIndex={0}
-                aria-label={file ? 'Change selected medicine photo' : 'Choose a medicine photo'}
-                onClick={() => fileRef.current?.click()}
-                onKeyDown={openFilePickerFromKeyboard}
                 onDragOver={(event) => { event.preventDefault(); setIsDragging(true) }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={dropFile}
               >
-                {preview ? <DetectionPreview src={preview} alt="Selected medicine preview" detections={detections} /> : (
+                {preview ? <DetectionPreview src={preview} alt="Selected medicine preview" detections={[]} /> : (
                   <div className="upload-empty">
                     <span aria-hidden="true">+</span>
-                    <p>Drop a medicine photo here</p>
-                    <small>or click to choose one from your device</small>
+                    <p>Photo preview</p>
+                    <small>Use Take a photo or Upload from device above. Desktop users can also drop an image here.</small>
                   </div>
                 )}
               </div>
               {file && (
-                <div className={`inference-status is-${inferenceStatus}`} aria-live="polite">
-                  <span aria-hidden="true" />
-                  <div>
-                    <b>Browser YOLO11</b>
-                    <small>
-                      {inferenceStatus === 'loading-model' && 'Loading ONNX model…'}
-                      {inferenceStatus === 'preprocessing' && 'Resizing and normalizing image…'}
-                      {inferenceStatus === 'running' && 'Running on-device inference…'}
-                      {inferenceStatus === 'success' && `${detections.length} detection${detections.length === 1 ? '' : 's'} · ${inferenceBackend === 'webgpu' ? 'WebGPU' : 'WASM'} · ${Math.round(inferenceMs)} ms`}
-                      {inferenceStatus === 'error' && inferenceError}
-                    </small>
-                  </div>
-                </div>
-              )}
-              {file && (
                 <div className="file-summary" aria-live="polite">
-                  <div><span aria-hidden="true">✓</span><p><b>Photo ready</b><small>{file.name}</small></p></div>
-                  <button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); removeFile() }}>REMOVE</button>
+                  <div><span aria-hidden="true">✓</span><p><b>Preview ready · not analyzed</b><small>{file.name}</small></p></div>
+                  <button type="button" className="text-button" onClick={removeFile}>CANCEL</button>
                 </div>
               )}
-              <button type="button" className="figma-button black analyze-button" onClick={analyze} disabled={isAnalyzing}>
-                {isAnalyzing ? <><span className="spinner" aria-hidden="true" /> ANALYZING IMAGE…</> : file ? 'START IMAGE RECOGNITION →' : 'CHOOSE A PHOTO →'}
+              <button type="button" className="figma-button black analyze-button" onClick={openFixedDemoCase} disabled={isAnalyzing}>
+                {isAnalyzing ? <><span className="spinner" aria-hidden="true" /> OPENING DEMO CASE…</> : 'CONTINUE WITH FIXED DEMO CASE →'}
               </button>
-              <p className="privacy-note">Your image is previewed locally for this mock analysis and is not uploaded or stored.</p>
+              <p className="privacy-note">Demo Mode: photos are previewed locally, are not uploaded or stored, and do not affect the fixed result.</p>
             </div>
           </section>
 
@@ -501,7 +495,7 @@ function App() {
           </section>
 
           <section className="learn-section" aria-labelledby="learn-title">
-            <SectionHeading eyebrow="THE OCEAN CONNECTION" title="Small residues. System-wide effects." text="Explore how pharmaceutical pollution can affect marine life across species, habitats, and generations." />
+            <SectionHeading id="learn-title" eyebrow="THE OCEAN CONNECTION" title="Small residues. System-wide effects." text="Explore how pharmaceutical pollution can affect marine life across species, habitats, and generations." />
             <div className="marine-grid">
               {marineFacts.map((fact) => (
                 <article key={fact.name}>
@@ -525,19 +519,21 @@ function App() {
 
       {page === 'result' && result && (
         <div className="page-shell result-page">
-          <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>← NEW SCAN</button><span>ANALYSIS COMPLETE · MOCK RESULT</span></div>
-          <ProcessSteps active={recycledForResult ? 4 : 2} />
+          <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>← BACK TO PREVIEW</button><span>DEMO MODE · FIXED CASE · NOT LIVE AI</span></div>
+          <ProcessSteps active={recycledForResult ? 4 : returnPlanConfirmed ? 2 : 1} />
           <section className="result-hero" aria-live="polite">
-            <div className="result-image">{preview && <DetectionPreview src={preview} alt="Analyzed medicine" detections={detections} />}</div>
+            <div className="result-image">
+              {preview ? <DetectionPreview src={preview} alt="User-selected preview, not analyzed" detections={[]} /> : (
+                <div className="demo-case-card"><span>FIXED DEMONSTRATION CASE</span><b>Ethinyl Estradiol<br />0.03 mg</b><small>No photo identification is performed in Demo Mode.</small></div>
+              )}
+              {preview && <div className="preview-disclaimer">PREVIEW ONLY · THIS PHOTO WAS NOT ANALYZED</div>}
+            </div>
             <div className="result-summary">
-              <p className="eyebrow">AI-ASSISTED DEMO MATCH</p>
+              <p className="eyebrow">FIXED CASE · NOT AN IMAGE RECOGNITION RESULT</p>
               <h1>{result.drugName}</h1><p className="category-line">{result.category}</p>
               <div className={`action-badge ${result.action}`}><span aria-hidden="true">{result.action === 'return' ? '↗' : '✓'}</span>{result.action === 'return' ? 'RETURN TO A PROFESSIONAL COLLECTION POINT' : 'FOLLOW LOCAL HOUSEHOLD DISPOSAL GUIDANCE'}</div>
-              <div className="confidence-meter" aria-label={`Image recognition confidence ${Math.round(result.confidence * 100)} percent`}>
-                <div><span>Mock recognition confidence</span><b>{Math.round(result.confidence * 100)}%</b></div>
-                <i><span style={{ width: `${Math.round(result.confidence * 100)}%` }} /></i>
-              </div>
-              <p className="medical-disclaimer">Demo output is guidance, not medical advice. Do not change how you take a medicine without consulting a qualified professional.</p>
+              <div className="demo-result-notice"><b>Demo Mode</b><span>This guidance belongs to the fixed Ethinyl Estradiol case, not to your selected photo.</span></div>
+              <p className="medical-disclaimer">Prototype guidance is not medical advice. Confirm the medicine and local disposal requirements with a qualified professional.</p>
             </div>
           </section>
 
@@ -548,9 +544,14 @@ function App() {
           {pharmacySection}
 
           <div className="result-action-panel">
-            <div><p className="eyebrow">STEP 03 · POSITIVE REINFORCEMENT</p><h2>{recycledForResult ? 'This disposal has been recorded.' : 'Confirm after the medicine is safely handed over.'}</h2></div>
-            <button type="button" className={`figma-button blue${recycledForResult ? ' completed' : ''}`} onClick={markAsRecycled} disabled={recycledForResult}>
-              {recycledForResult ? '✓ RECORDED IN MY OCEAN' : 'I RECYCLED IT PROPERLY'}
+            <div><p className="eyebrow">STEP 03 · DEMO COMPLETION</p><h2>{recycledForResult ? 'Demo completion recorded. Marine life unlocked.' : returnPlanConfirmed ? 'Return plan ready. Simulate the hand-off to unlock a card.' : 'Find and plan a return option before simulating completion.'}</h2></div>
+            <button
+              type="button"
+              className={`figma-button blue${recycledForResult ? ' completed' : ''}`}
+              onClick={() => returnPlanConfirmed ? markAsRecycled() : document.getElementById('nearest-pharmacy')?.scrollIntoView({ behavior: 'smooth' })}
+              disabled={recycledForResult}
+            >
+              {recycledForResult ? '✓ MARINE LIFE UNLOCKED' : returnPlanConfirmed ? 'SIMULATE COMPLETION & UNLOCK' : 'FIND / PLAN A RETURN OPTION'}
             </button>
           </div>
 
@@ -597,6 +598,7 @@ function App() {
             <div className={`collection-progress${recycledCount === marineCards.length ? ' is-complete' : ''}`}>
               <i><span style={{ width: `${(recycledCount / marineCards.length) * 100}%` }} /></i>
               <p><b>{recycledCount}</b> of {marineCards.length} cards unlocked{recycledCount === marineCards.length ? ' · Collection complete' : ''}</p>
+              <button type="button" className="text-button reset-demo-button" onClick={resetDemoProgress}>RESET DEMO PROGRESS</button>
             </div>
           </section>
           <section className="collection-grid" aria-label="Marine life card collection">

@@ -1,7 +1,6 @@
 export type AnalysisResult = {
   drugName: string
   category: string
-  confidence: number
   action: 'return' | 'household'
   reason: string
   steps: string[]
@@ -15,18 +14,18 @@ export type Pharmacy = {
   address: string
   phone?: string
   distance: number
+  takeBackStatus: 'verified' | 'unverified'
 }
 
 export type PageName = 'home' | 'result' | 'activity'
 export type LocatorState = 'idle' | 'locating' | 'ready' | 'fallback' | 'error'
 
-export const mockAnalysis: AnalysisResult = {
+export const fixedDemoCase: AnalysisResult = {
   drugName: 'Ethinyl Estradiol 0.03 mg',
-  category: 'Hormonal medication | Prescription medicine',
-  confidence: 0.94,
+  category: 'Fixed demonstration case | Hormonal medication',
   action: 'return',
   reason:
-    'The image was identified as hormonal medication. It should be returned to a medical institution or a participating pharmacy so that active ingredients do not enter wastewater or get used accidentally.',
+    'This fixed demonstration case represents unused hormonal medication. It should be returned to a medical institution or a confirmed collection point so active ingredients do not enter wastewater or get used accidentally.',
   steps: [
     'Keep the medicine in its original packaging or medication bag.',
     'Do not flush it down a toilet or sink, and do not place it in household recycling.',
@@ -41,7 +40,7 @@ export const fallbackPharmacies: Omit<Pharmacy, 'distance'>[] = [
     lat: 24.1799,
     lon: 120.6468,
     address: 'Section 3, Taiwan Boulevard, Xitun District, Taichung',
-    phone: '+886 4 0000 0001',
+    takeBackStatus: 'unverified',
   },
   {
     id: 'demo-2',
@@ -49,7 +48,7 @@ export const fallbackPharmacies: Omit<Pharmacy, 'distance'>[] = [
     lat: 24.1838,
     lon: 120.6412,
     address: 'Section 2, Henan Road, Xitun District, Taichung',
-    phone: '+886 4 0000 0002',
+    takeBackStatus: 'unverified',
   },
   {
     id: 'demo-3',
@@ -57,6 +56,7 @@ export const fallbackPharmacies: Omit<Pharmacy, 'distance'>[] = [
     lat: 24.1745,
     lon: 120.6509,
     address: 'Section 3, Wenxin Road, Xitun District, Taichung',
+    takeBackStatus: 'unverified',
   },
 ]
 

@@ -444,6 +444,26 @@ button:disabled {
   font-size: 9px;
 }
 
+.photo-entry-actions {
+  display: grid;
+  margin-bottom: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.figma-button.outline {
+  border: 1px solid var(--black);
+  background: #fff;
+  color: var(--black);
+}
+
+.camera-fallback-note {
+  margin: 0 0 14px;
+  color: #777;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .photo-picker {
   display: grid;
   width: 100%;
@@ -456,11 +476,10 @@ button:disabled {
   background: #fafafa;
   color: #4d4d4d;
   text-align: center;
-  cursor: pointer;
+  cursor: default;
   transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
 
-.photo-picker:hover,
 .photo-picker.is-dragging {
   border-color: var(--figma-blue);
   background: var(--blue-light);
@@ -1000,6 +1019,12 @@ button:disabled {
   font-size: 10px;
 }
 
+.pharmacy-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .location-note {
   margin: 18px 0 0;
   color: var(--body-gray);
@@ -1064,6 +1089,18 @@ button:disabled {
   line-height: 1.5;
 }
 
+.pharmacy-copy .verification-label {
+  margin-top: 9px;
+  color: #986c31;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.pharmacy-copy .verification-label.is-verified {
+  color: #247b60;
+}
+
 .pharmacy-copy small {
   display: block;
   margin-top: 5px;
@@ -1112,6 +1149,37 @@ button:disabled {
   font-size: 10px;
 }
 
+.return-plan-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  margin-top: 28px;
+  border-left: 3px solid var(--figma-blue);
+  padding: 4px 0 4px 18px;
+}
+
+.return-plan-action b,
+.return-plan-action p {
+  display: block;
+  margin: 0;
+}
+
+.return-plan-action b {
+  font-size: 13px;
+}
+
+.return-plan-action p {
+  margin-top: 5px;
+  color: #777;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.return-plan-action .figma-button {
+  flex: 0 0 auto;
+}
+
 .result-page,
 .activity-page {
   padding-top: 35px;
@@ -1141,11 +1209,55 @@ button:disabled {
 }
 
 .result-image {
+  position: relative;
   display: grid;
   min-height: 560px;
   place-items: center;
   overflow: hidden;
   background: var(--surface);
+}
+
+.demo-case-card {
+  display: flex;
+  width: min(390px, calc(100% - 48px));
+  min-height: 390px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  padding: 42px;
+  background: #fff;
+  flex-direction: column;
+  text-align: center;
+}
+
+.demo-case-card span,
+.demo-case-card small {
+  color: #888;
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+}
+
+.demo-case-card b {
+  margin: 34px 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 38px;
+  line-height: 1.02;
+  font-weight: 400;
+}
+
+.preview-disclaimer {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  padding: 11px 14px;
+  background: rgba(5, 5, 5, 0.9);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
 }
 
 .result-image img {
@@ -1202,6 +1314,25 @@ button:disabled {
 
 .confidence-meter {
   margin-top: 34px;
+}
+
+.demo-result-notice {
+  display: flex;
+  margin-top: 28px;
+  border-left: 3px solid var(--figma-blue);
+  flex-direction: column;
+  gap: 5px;
+  padding: 3px 0 3px 15px;
+}
+
+.demo-result-notice b {
+  font-size: 12px;
+}
+
+.demo-result-notice span {
+  color: #777;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .confidence-meter > div {
@@ -1468,6 +1599,10 @@ button:disabled {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.reset-demo-button {
+  margin-top: 15px;
 }
 
 .collection-grid {
@@ -1833,6 +1968,10 @@ button:disabled {
     gap: 5px;
   }
 
+  .photo-entry-actions {
+    grid-template-columns: 1fr;
+  }
+
   .photo-picker {
     min-height: 270px;
   }
@@ -1915,6 +2054,23 @@ button:disabled {
   .pharmacy-row {
     grid-template-columns: 34px minmax(0, 1fr);
     gap: 12px;
+  }
+
+  .return-plan-action {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pharmacy-entry-actions {
+    flex-direction: column;
+  }
+
+  .pharmacy-entry-actions .figma-button {
+    width: 100%;
+  }
+
+  .return-plan-action .figma-button {
+    width: 100%;
   }
 
   .pharmacy-actions {
