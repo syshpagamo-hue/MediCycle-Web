@@ -31,6 +31,7 @@ import {
   type Pharmacy,
 } from './data'
 import {
+  buildPharmacySearchPath,
   parsePharmacySearchResponse,
   sortByDistance,
 } from './pharmacy'
@@ -484,8 +485,6 @@ function App() {
       return
     }
     setLocatorState('locating')
-    setPharmacies([])
-    setMapCenter(null)
     setSelectedPharmacyId(null)
     setSearchRadiusKm(null)
     navigator.geolocation.getCurrentPosition(
@@ -500,7 +499,7 @@ function App() {
         )
         try {
           const response = await fetch(
-            `/api/pharmacies?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`,
+            buildPharmacySearchPath({ lat: latitude, lon: longitude }),
             { signal: controller.signal, headers: { Accept: 'application/json' } },
           )
           if (!response.ok) throw new Error('Pharmacy proxy failed')
@@ -510,6 +509,7 @@ function App() {
 
           if (attempt !== pharmacySearchAttemptRef.current) return
           if (!nearby.length) {
+            setPharmacies([])
             setLocatorState('empty')
             setMapCenter({ lat: latitude, lon: longitude })
             setSearchRadiusKm(data.radiusKm)
@@ -521,8 +521,6 @@ function App() {
           setLocatorState('ready')
         } catch (error) {
           if (attempt !== pharmacySearchAttemptRef.current) return
-          setPharmacies([])
-          setMapCenter({ lat: latitude, lon: longitude })
           setLocatorState(
             error instanceof DOMException && error.name === 'AbortError'
               ? 'timeout'
@@ -538,8 +536,6 @@ function App() {
       (error) => {
         if (attempt !== pharmacySearchAttemptRef.current) return
         setLocatorState(error.code === error.TIMEOUT ? 'location-timeout' : 'location-error')
-        setPharmacies([])
-        setMapCenter(null)
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     )

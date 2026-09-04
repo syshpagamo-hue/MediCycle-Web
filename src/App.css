@@ -2137,6 +2137,124 @@ button:disabled {
   color: #fff;
 }
 
+.quiz-explanation {
+  margin-top: 26px;
+  border: 1px solid #cddfe7;
+  border-radius: 5px;
+  padding: 22px;
+  background: #f6fbfd;
+  overflow-wrap: anywhere;
+}
+
+.quiz-explanation-kicker {
+  margin: 0 0 8px;
+  color: #337d9d;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.quiz-explanation h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.quiz-explanation > p:not(.quiz-explanation-kicker) {
+  margin: 9px 0 0;
+  color: #45545a;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.quiz-explanation h4 {
+  margin: 20px 0 9px;
+  color: #35444a;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.quiz-explanation ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-explanation > ul {
+  display: grid;
+  gap: 7px;
+}
+
+.quiz-explanation > ul li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  color: #5d696e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.quiz-explanation > ul li b {
+  color: #26353b;
+}
+
+.quiz-sources {
+  margin-top: 20px;
+  border-top: 1px solid #cddfe7;
+  padding-top: 1px;
+}
+
+.quiz-sources ul {
+  display: grid;
+  gap: 8px;
+}
+
+.quiz-sources a {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 14px;
+  border-radius: 4px;
+  padding: 11px 12px;
+  background: #fff;
+  color: #243239;
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px #dce9ee;
+}
+
+.quiz-sources a:hover,
+.quiz-sources a:focus-visible {
+  color: #17698d;
+  box-shadow: inset 0 0 0 1px #64a7c2;
+}
+
+.quiz-sources a span,
+.quiz-sources a b {
+  min-width: 0;
+  grid-column: 1;
+}
+
+.quiz-sources a span {
+  color: #59737e;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.quiz-sources a b {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.quiz-sources a i {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #337d9d;
+  font-style: normal;
+}
+
 .quiz-action-row {
   display: flex;
   min-height: 70px;
@@ -3043,6 +3161,14 @@ button:disabled {
   .quiz-options label {
     min-height: 62px;
     padding: 12px;
+  }
+
+  .quiz-explanation {
+    padding: 18px 14px;
+  }
+
+  .quiz-sources a {
+    padding: 10px;
   }
 
   .quiz-action-row {

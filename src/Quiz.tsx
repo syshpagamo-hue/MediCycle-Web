@@ -29,6 +29,7 @@ export function Quiz({
   const baseQuestion = quizQuestions[questionIndex]
   const localized = zhQuizCopy[questionIndex]
   const question = language === 'zh-TW' ? { ...baseQuestion, question: localized[0], options: baseQuestion.options.map((option, index) => ({ ...option, text: localized[index + 1] })) } : baseQuestion
+  const explanation = baseQuestion.explanation[language]
   const isCorrect = selectedOptionId === question.correctOptionId
   const percentage = Math.round((score / quizQuestions.length) * 100)
 
@@ -112,6 +113,42 @@ export function Quiz({
                 })}
               </div>
             </fieldset>
+            {selectedOptionId && (
+              <section className="quiz-explanation" aria-labelledby={`explanation-${question.id}`}>
+                <p className="quiz-explanation-kicker">{t('detailedExplanation')}</p>
+                <h3 id={`explanation-${question.id}`}>{t('whyCorrect')}</h3>
+                <p>{explanation.correct}</p>
+                <h4>{t('otherOptions')}</h4>
+                <ul>
+                  {question.options
+                    .filter((option) => option.id !== question.correctOptionId)
+                    .map((option) => (
+                      <li key={option.id}>
+                        <b>{option.id}</b>
+                        <span>{explanation.incorrect[option.id]}</span>
+                      </li>
+                    ))}
+                </ul>
+                <div className="quiz-sources">
+                  <h4>{t('trustedSources')}</h4>
+                  <ul>
+                    {baseQuestion.sources.map((source) => (
+                      <li key={source.href}>
+                        <a
+                          href={source.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span>{source.organization}</span>
+                          <b>{source.title}</b>
+                          <i aria-hidden="true">↗</i>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            )}
             <div className="quiz-action-row">
               <div className={`quiz-feedback${selectedOptionId ? (isCorrect ? ' is-correct' : ' is-incorrect') : ''}`} aria-live="polite">
                 {selectedOptionId && <b>{isCorrect ? t('correct') : t('incorrect')}</b>}

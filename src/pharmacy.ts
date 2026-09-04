@@ -21,6 +21,21 @@ export type PharmacySearchResponse = {
   radiusKm: number
 }
 
+function serializeCoordinate(value: number, minimum: number, maximum: number) {
+  if (!Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new RangeError('Pharmacy search coordinates are out of range.')
+  }
+  // Number#toString always uses an ASCII decimal point and is independent of UI locale.
+  return value.toString()
+}
+
+export function buildPharmacySearchPath({ lat, lon }: { lat: number; lon: number }) {
+  const params = new URLSearchParams()
+  params.set('lat', serializeCoordinate(lat, -90, 90))
+  params.set('lon', serializeCoordinate(lon, -180, 180))
+  return `/api/pharmacies?${params.toString()}`
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -81,14 +96,14 @@ export function buildOverpassQuery(lat: number, lon: number, radius: number) {
 }
 
 function addressFromTags(tags: Record<string, string>) {
-  if (tags['addr:full:en']) return tags['addr:full:en']
   if (tags['addr:full']) return tags['addr:full']
+  if (tags['addr:full:en']) return tags['addr:full:en']
   return (
     [
       tags['addr:housenumber'],
-      tags['addr:street:en'] || tags['addr:street'],
-      tags['addr:district:en'] || tags['addr:district'],
-      tags['addr:city:en'] || tags['addr:city'],
+      tags['addr:street'] || tags['addr:street:en'],
+      tags['addr:district'] || tags['addr:district:en'],
+      tags['addr:city'] || tags['addr:city:en'],
       tags['addr:postcode'],
     ]
       .filter(Boolean)
@@ -105,7 +120,7 @@ export function pharmaciesFromOverpass(elements: OverpassElement[]) {
       const tags = element.tags ?? {}
       return {
         id: `${element.type}-${element.id}`,
-        name: tags['name:en'] || tags.name || 'Unnamed pharmacy',
+        name: tags.name || tags['name:en'] || 'Unnamed pharmacy',
         lat,
         lon,
         address: addressFromTags(tags),
