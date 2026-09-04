@@ -326,7 +326,7 @@ function App() {
           title="Nearby pharmacies."
           text="These are nearby pharmacies, not verified medication return points. Contact the pharmacy to confirm medication take-back availability before visiting."
         />
-        <div className="privacy-chip"><span aria-hidden="true" /> Location stays in your browser</div>
+        <div className="privacy-chip"><span aria-hidden="true" /> Uses OpenStreetMap search</div>
       </div>
       <div className="pharmacy-entry-actions">
         <button
@@ -341,6 +341,7 @@ function App() {
           VIEW SAMPLE PHARMACIES
         </button>
       </div>
+      <p className="location-note privacy-disclosure">Using your current location sends its coordinates to the OpenStreetMap Overpass service for this nearby search. Choose sample pharmacies to avoid sharing location.</p>
       {locatorState === 'locating' && (
         <p className="location-note" role="status">Allow location access when your browser asks. This usually takes a few seconds.</p>
       )}
