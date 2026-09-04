@@ -1841,12 +1841,20 @@ button:disabled {
 }
 
 .medicine-category > span,
-.medicine-highlight-legend i {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 8px;
-  border-radius: 50%;
+.medicine-highlight-legend i,
+.candidate-list li > em i {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  border-radius: 4px;
   background: currentColor;
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .medicine-category.is-endocrine-related {
@@ -1880,6 +1888,43 @@ button:disabled {
 
 .medicine-highlight-legend .is-endocrine-related {
   color: var(--endocrine-accent);
+}
+
+.hormone-highlight-explanation {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--hormone-accent), white 62%);
+  border-left: 4px solid var(--hormone-accent);
+  padding: 14px 16px 14px 13px;
+  background: var(--hormone-tint);
+  color: #342354;
+}
+
+.hormone-highlight-explanation > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--hormone-accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.hormone-highlight-explanation b {
+  display: block;
+  color: var(--hormone-accent);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.hormone-highlight-explanation p {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .candidate-list {
@@ -1948,12 +1993,23 @@ button:disabled {
 }
 
 .candidate-list li > em {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--hormone-accent);
   font-size: 9px;
   font-style: normal;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.candidate-list li > em i {
+  width: 15px;
+  height: 15px;
+  flex-basis: 15px;
+  border-radius: 3px;
+  font-size: 8px;
 }
 
 .candidate-list li.is-endocrine-related > em {
@@ -3016,6 +3072,18 @@ button:disabled {
   .medicine-highlight-legend {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .hormone-highlight-explanation {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 12px 12px 10px;
+  }
+
+  .hormone-highlight-explanation > span {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
   }
 
   .candidate-list-heading {

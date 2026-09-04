@@ -134,6 +134,9 @@ function App() {
   const predictionMeta = prediction
     ? getMedicineMeta(prediction.label)
     : undefined
+  const hasHormoneTherapyDetection = detections.some(
+    (detection) => getMedicineMeta(detection.label, detection.classId)?.category === 'hormone-therapy',
+  )
 
   const medicineCategoryLabel = (category: MedicineCategory) => {
     if (category === 'hormone-therapy') return t('hormoneTherapy')
@@ -961,14 +964,20 @@ function App() {
               <h1>{prediction ? getMedicineDisplayName(prediction.label) : result.drugName}</h1><p className="category-line">{t('resultCategory')}</p>
               {predictionMeta?.highlight && (
                 <p className={`medicine-category is-${predictionMeta.category}`}>
-                  <span aria-hidden="true" />
+                  <span aria-hidden="true">{predictionMeta.category === 'hormone-therapy' ? 'H' : 'E'}</span>
                   {medicineCategoryLabel(predictionMeta.category)}
                 </p>
               )}
-              <div className="medicine-highlight-legend" aria-label={t('classificationLegend')}>
-                <span className="is-hormone-therapy"><i aria-hidden="true" />{t('hormoneTherapy')}</span>
-                <span className="is-endocrine-related"><i aria-hidden="true" />{t('endocrineRelated')}</span>
+              <div className={`medicine-highlight-legend${hasHormoneTherapyDetection ? ' has-hormone-detection' : ''}`} aria-label={t('classificationLegend')}>
+                <span className="is-hormone-therapy"><i aria-hidden="true">H</i>{t('hormoneTherapy')}</span>
+                <span className="is-endocrine-related"><i aria-hidden="true">E</i>{t('endocrineRelated')}</span>
               </div>
+              {hasHormoneTherapyDetection && (
+                <aside className="hormone-highlight-explanation">
+                  <span aria-hidden="true">H</span>
+                  <div><b>{t('hormoneHighlightTitle')}</b><p>{t('hormoneHighlightExplanation')}</p></div>
+                </aside>
+              )}
               {prediction && (
                 <div className="confidence-meter">
                   <div><span>{t('confidence')}</span><b>{(prediction.confidence * 100).toFixed(1)}%</b></div>
@@ -988,7 +997,7 @@ function App() {
                       <li className={meta?.highlight ? `is-${meta.category}` : undefined} key={`${detection.classId}-${index}`}>
                         <span className="candidate-swatch" style={{ backgroundColor: getMedicineColor(detection.label, detection.classId) }} aria-hidden="true" />
                         <b>{getMedicineDisplayName(detection.label, detection.classId)}</b>
-                        {meta?.highlight && <em>{medicineCategoryLabel(meta.category)}</em>}
+                        {meta?.highlight && <em><i aria-hidden="true">{meta.category === 'hormone-therapy' ? 'H' : 'E'}</i>{medicineCategoryLabel(meta.category)}</em>}
                         <small>{(detection.confidence * 100).toFixed(1)}%</small>
                       </li>
                     )
