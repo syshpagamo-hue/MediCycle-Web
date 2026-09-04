@@ -55,6 +55,49 @@ button:disabled {
   background: var(--white);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.session-ended {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 22px;
+  border-left: 4px solid var(--figma-blue);
+  padding: 18px 20px;
+  background: var(--blue-light);
+}
+
+.session-ended h2,
+.session-ended p {
+  margin: 0;
+}
+
+.session-ended h2 {
+  margin-top: 5px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 27px;
+  font-weight: 400;
+}
+
+.session-ended div > p:last-child {
+  margin-top: 5px;
+  color: #666;
+  font-size: 12px;
+}
+
+.session-ended .figma-button {
+  flex: 0 0 auto;
+}
+
 .site-header {
   position: sticky;
   z-index: 30;
@@ -462,6 +505,55 @@ button:disabled {
   color: #777;
   font-size: 10px;
   line-height: 1.45;
+}
+
+.camera-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  border-left: 3px solid var(--figma-blue);
+  padding: 9px 12px;
+  background: var(--blue-light);
+  color: #555;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.camera-status.is-error {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.spinner.dark {
+  flex: 0 0 auto;
+  border-color: rgba(0, 0, 0, 0.2);
+  border-top-color: #333;
+}
+
+.camera-stage {
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #111;
+}
+
+.camera-stage video {
+  display: block;
+  width: 100%;
+  max-height: 390px;
+  object-fit: cover;
+}
+
+.camera-stage > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  background: #fff;
 }
 
 .photo-picker {
@@ -1052,6 +1144,12 @@ button:disabled {
   color: #555;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.location-error > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
 }
 
 .pharmacy-list {
@@ -1893,6 +1991,17 @@ button:disabled {
     padding: 18px 0 76px;
   }
 
+  .session-ended {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .session-ended .figma-button {
+    width: 100%;
+  }
+
   .hero-caption {
     grid-template-columns: 1fr;
     align-items: start;
@@ -1970,6 +2079,11 @@ button:disabled {
 
   .photo-entry-actions {
     grid-template-columns: 1fr;
+  }
+
+  .camera-stage > div {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .photo-picker {

@@ -18,7 +18,15 @@ export type Pharmacy = {
 }
 
 export type PageName = 'home' | 'result' | 'activity'
-export type LocatorState = 'idle' | 'locating' | 'ready' | 'fallback' | 'error'
+export type LocatorState =
+  | 'idle'
+  | 'locating'
+  | 'ready'
+  | 'fallback'
+  | 'location-error'
+  | 'timeout'
+  | 'network-error'
+  | 'empty'
 
 export const fixedDemoCase: AnalysisResult = {
   drugName: 'Ethinyl Estradiol 0.03 mg',

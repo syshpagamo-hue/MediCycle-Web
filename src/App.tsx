@@ -28,6 +28,14 @@ import {
 
 const DEMO_PROGRESS_KEY = 'medicycle-demo-recycled-count'
 const LEGACY_PROGRESS_KEY = 'medicine-recycled'
+const OVERPASS_TIMEOUT_MS = 10_000
+
+type CameraState =
+  | 'idle'
+  | 'opening'
+  | 'ready'
+  | 'permission-denied'
+  | 'unavailable'
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const toRad = (value: number) => (value * Math.PI) / 180
@@ -84,13 +92,18 @@ function getStoredProgress() {
 }
 
 function App() {
-  const cameraRef = useRef<HTMLInputElement>(null)
+  const cameraVideoRef = useRef<HTMLVideoElement>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
+  const cameraAttemptRef = useRef(0)
   const uploadRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLElement>(null)
+  const dialogCloseRef = useRef<HTMLButtonElement>(null)
+  const dialogTriggerRef = useRef<HTMLElement | null>(null)
   const [page, setPage] = useState<PageName>('home')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [captureSource, setCaptureSource] = useState<'camera' | 'upload' | null>(null)
+  const [cameraState, setCameraState] = useState<CameraState>('idle')
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
@@ -103,6 +116,9 @@ function App() {
   const [returnPlanConfirmed, setReturnPlanConfirmed] = useState(false)
   const [quizAnswers, setQuizAnswers] = useState({ disposal: '', consequence: '' })
   const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [sessionEnded, setSessionEnded] = useState(
+    () => window.location.hash === pageHash.result,
+  )
 
   useEffect(() => {
     const onPopState = () => {
@@ -124,18 +140,53 @@ function App() {
     if (preview) URL.revokeObjectURL(preview)
   }, [preview])
 
+  useEffect(() => () => {
+    cameraAttemptRef.current += 1
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+    cameraStreamRef.current = null
+  }, [])
+
   useEffect(() => {
     if (!unlockedCard) return
-    dialogRef.current?.focus()
+    const trigger = dialogTriggerRef.current
+    window.requestAnimationFrame(() => dialogCloseRef.current?.focus())
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setUnlockedCard(null)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setUnlockedCard(null)
+        return
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      if (!focusable.length) {
+        event.preventDefault()
+        dialogRef.current.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.requestAnimationFrame(() => trigger?.focus())
+    }
   }, [unlockedCard])
 
   const navigate = (nextPage: PageName) => {
     if (nextPage === 'result' && !result) return
+    if (nextPage !== 'home') stopCamera()
     window.history.pushState({ page: nextPage }, '', pageHash[nextPage])
     setPage(nextPage)
   }
@@ -154,6 +205,46 @@ function App() {
   const showToast = (message: string) => {
     setToast(message)
     window.setTimeout(() => setToast(''), 3400)
+  }
+
+  const stopCamera = (nextState: CameraState = 'idle') => {
+    cameraAttemptRef.current += 1
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+    cameraStreamRef.current = null
+    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null
+    setCameraState(nextState)
+  }
+
+  const openCamera = async () => {
+    stopCamera('opening')
+    const attempt = cameraAttemptRef.current
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraState('unavailable')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+      })
+      if (attempt !== cameraAttemptRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      cameraStreamRef.current = stream
+      setCameraState('ready')
+      window.requestAnimationFrame(() => {
+        if (cameraVideoRef.current) cameraVideoRef.current.srcObject = stream
+      })
+    } catch (error) {
+      if (attempt !== cameraAttemptRef.current) return
+      const name = error instanceof DOMException ? error.name : ''
+      setCameraState(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'permission-denied'
+          : 'unavailable',
+      )
+    }
   }
 
   const resetAnalysisState = () => {
@@ -182,8 +273,39 @@ function App() {
     resetAnalysisState()
   }
 
+  const captureCameraPhoto = () => {
+    const video = cameraVideoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      stopCamera('unavailable')
+      return
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')?.drawImage(video, 0, 0)
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          stopCamera('unavailable')
+          return
+        }
+        acceptFile(
+          new File([blob], `medicycle-photo-${Date.now()}.jpg`, {
+            type: 'image/jpeg',
+          }),
+          'camera',
+        )
+        stopCamera()
+      },
+      'image/jpeg',
+      0.9,
+    )
+  }
+
   const selectFile = (source: 'camera' | 'upload') => (event: ChangeEvent<HTMLInputElement>) => {
-    acceptFile(event.target.files?.[0], source)
+    const selected = event.target.files?.[0]
+    event.target.value = ''
+    acceptFile(selected, source)
   }
 
   const dropFile = (event: DragEvent<HTMLDivElement>) => {
@@ -198,11 +320,12 @@ function App() {
     setPreview(null)
     setCaptureSource(null)
     resetAnalysisState()
-    if (cameraRef.current) cameraRef.current.value = ''
     if (uploadRef.current) uploadRef.current.value = ''
   }
 
   const openFixedDemoCase = async () => {
+    stopCamera()
+    setSessionEnded(false)
     setIsAnalyzing(true)
     await new Promise((resolve) => window.setTimeout(resolve, 450))
     const demoResult = { ...fixedDemoCase, steps: [...fixedDemoCase.steps] }
@@ -232,11 +355,20 @@ function App() {
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         const { latitude, longitude } = coords
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(
+          () => controller.abort(),
+          OVERPASS_TIMEOUT_MS,
+        )
         try {
-          const query = `[out:json][timeout:12];(node["amenity"="pharmacy"](around:3500,${latitude},${longitude});way["amenity"="pharmacy"](around:3500,${latitude},${longitude}););out center tags;`
+          const query = `[out:json][timeout:10];(node["amenity"="pharmacy"](around:3500,${latitude},${longitude});way["amenity"="pharmacy"](around:3500,${latitude},${longitude}););out center tags;`
           const response = await fetch(
             `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+            { signal: controller.signal },
           )
+          if (response.status === 408 || response.status === 504) {
+            throw new DOMException('Map service timed out', 'AbortError')
+          }
           if (!response.ok) throw new Error('Map service failed')
           const data = (await response.json()) as {
             elements: Array<{
@@ -264,15 +396,25 @@ function App() {
               }
             })
             .filter((item): item is Omit<Pharmacy, 'distance'> => item !== null)
-          if (!nearby.length) throw new Error('No pharmacy found')
+          if (!nearby.length) {
+            setLocatorState('empty')
+            return
+          }
           setPharmacies(sortByDistance(nearby, latitude, longitude))
           setLocatorState('ready')
-        } catch {
-          showFallbackLocation(latitude, longitude)
+        } catch (error) {
+          setPharmacies([])
+          setLocatorState(
+            error instanceof DOMException && error.name === 'AbortError'
+              ? 'timeout'
+              : 'network-error',
+          )
+        } finally {
+          window.clearTimeout(timeoutId)
         }
       },
       () => {
-        setLocatorState('error')
+        setLocatorState('location-error')
         setPharmacies([])
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
@@ -290,7 +432,22 @@ function App() {
     } catch {
       showToast('Progress could not be saved on this device.')
     }
+    dialogTriggerRef.current = document.activeElement as HTMLElement | null
     setUnlockedCard(marineCards[Math.max(0, next - 1)])
+  }
+
+  const closeUnlockedCard = () => setUnlockedCard(null)
+
+  const startNewScan = () => {
+    setSessionEnded(false)
+    resetAnalysisState()
+    window.history.replaceState({ page: 'home' }, '', pageHash.home)
+    setPage('home')
+    window.setTimeout(() => {
+      document
+        .getElementById('scan')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
   }
 
   const resetDemoProgress = () => {
@@ -351,10 +508,28 @@ function App() {
       {locatorState === 'fallback' && (
         <p className="location-note demo-note" role="status"><b>DEMO DATA</b> Showing sample pharmacies near Xitun District, Taichung.</p>
       )}
-      {locatorState === 'error' && (
+      {locatorState === 'location-error' && (
         <div className="location-error" role="alert">
           <p>We could not access your location. Enable Location Services for your browser, then try again.</p>
-          <button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+        </div>
+      )}
+      {locatorState === 'timeout' && (
+        <div className="location-error" role="alert">
+          <p>The pharmacy search timed out after 10 seconds. Your connection may be slow, or the map service may be busy.</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+        </div>
+      )}
+      {locatorState === 'network-error' && (
+        <div className="location-error" role="alert">
+          <p>We could not reach the OpenStreetMap pharmacy search. Check your connection and try again.</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+        </div>
+      )}
+      {locatorState === 'empty' && (
+        <div className="location-error" role="status">
+          <p>No pharmacies were found within 3.5 km. Try again or view sample results to continue the demo.</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
         </div>
       )}
       {pharmacies.length > 0 && (
@@ -408,6 +583,12 @@ function App() {
 
       {page === 'home' && (
         <div className="page-shell landing-page">
+          {sessionEnded && (
+            <section className="session-ended" role="status" aria-labelledby="session-ended-title">
+              <div><p className="eyebrow">DEMO SESSION</p><h2 id="session-ended-title">Demo session ended</h2><p>For privacy and clarity, a result is not restored after refresh.</p></div>
+              <button type="button" className="figma-button black" onClick={startNewScan}>START NEW SCAN</button>
+            </section>
+          )}
           <HeroArtwork onScan={() => goToSection('scan')} />
 
           <section className="value-strip" aria-label="Product value">
@@ -437,17 +618,25 @@ function App() {
                 <div><span className="status-dot" aria-hidden="true" /> DEMO MODE · PREVIEW ONLY</div>
                 <small>JPG · PNG · HEIC · MAX 10 MB</small>
               </div>
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={selectFile('camera')} />
               <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif" hidden onChange={selectFile('upload')} />
               <div className="photo-entry-actions" aria-label="Choose how to add a photo">
-                <button type="button" className="figma-button black" onClick={() => cameraRef.current?.click()}>
+                <button type="button" className="figma-button black" onClick={openCamera} disabled={cameraState === 'opening'}>
                   {captureSource === 'camera' && file ? 'RETAKE PHOTO' : 'TAKE A PHOTO'}
                 </button>
-                <button type="button" className="figma-button outline" onClick={() => uploadRef.current?.click()}>
+                <button type="button" className="figma-button outline" onClick={() => { stopCamera(); uploadRef.current?.click() }}>
                   {captureSource === 'upload' && file ? 'REPLACE PHOTO' : 'UPLOAD FROM DEVICE'}
                 </button>
               </div>
-              <p className="camera-fallback-note">Camera unavailable or permission declined? Use <b>Upload from device</b> instead.</p>
+              {cameraState === 'opening' && <p className="camera-status" role="status"><span className="spinner dark" aria-hidden="true" /> Opening camera…</p>}
+              {cameraState === 'permission-denied' && <div className="camera-status is-error" role="alert"><b>Camera permission denied.</b><span>Allow camera access in browser settings, or use Upload from device instead.</span></div>}
+              {cameraState === 'unavailable' && <div className="camera-status is-error" role="alert"><b>Camera unavailable.</b><span>This device or browser could not open a camera. Use Upload from device instead.</span></div>}
+              {cameraState === 'ready' && (
+                <div className="camera-stage" role="region" aria-label="Camera preview">
+                  <video ref={cameraVideoRef} autoPlay muted playsInline />
+                  <div><button type="button" className="figma-button black" onClick={captureCameraPhoto}>CAPTURE PHOTO</button><button type="button" className="text-button" onClick={() => stopCamera()}>CANCEL CAMERA</button></div>
+                </div>
+              )}
+              {cameraState === 'idle' && <p className="camera-fallback-note">Camera unavailable or permission declined? Use <b>Upload from device</b> instead.</p>}
               <div
                 className={`photo-picker${isDragging ? ' is-dragging' : ''}${preview ? ' has-photo' : ''}`}
                 onDragOver={(event) => { event.preventDefault(); setIsDragging(true) }}
@@ -550,7 +739,7 @@ function App() {
               type="button"
               className={`figma-button blue${recycledForResult ? ' completed' : ''}`}
               onClick={() => returnPlanConfirmed ? markAsRecycled() : document.getElementById('nearest-pharmacy')?.scrollIntoView({ behavior: 'smooth' })}
-              disabled={recycledForResult}
+              aria-disabled={recycledForResult}
             >
               {recycledForResult ? '✓ MARINE LIFE UNLOCKED' : returnPlanConfirmed ? 'SIMULATE COMPLETION & UNLOCK' : 'FIND / PLAN A RETURN OPTION'}
             </button>
@@ -628,12 +817,13 @@ function App() {
       </footer>
 
       {unlockedCard && (
-        <div className="card-dialog-backdrop" role="presentation" onMouseDown={() => setUnlockedCard(null)}>
-          <section className="card-dialog" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="card-title" onMouseDown={(event) => event.stopPropagation()}>
-            <button className="dialog-close" type="button" onClick={() => setUnlockedCard(null)} aria-label="Close card">×</button>
+        <div className="card-dialog-backdrop" role="presentation" onMouseDown={closeUnlockedCard}>
+          <section className="card-dialog" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="card-title" aria-describedby="card-description" onMouseDown={(event) => event.stopPropagation()}>
+            <button ref={dialogCloseRef} className="dialog-close" type="button" onClick={closeUnlockedCard} aria-label="Close card">×</button>
             <p>SECRET MARINE LIFE CARD</p><h2 id="card-title">You unlocked {unlockedCard.name}!</h2>
             <img src={unlockedCard.image} alt={`${unlockedCard.name} marine life card`} width={440} height={590} />
-            <button type="button" className="figma-button black" onClick={() => { setUnlockedCard(null); window.setTimeout(() => document.getElementById('impact-check')?.scrollIntoView({ behavior: 'smooth' }), 80) }}>CONTINUE TO IMPACT CHECK</button>
+            <p id="card-description" className="sr-only">A marine life card was unlocked after the demo completion.</p>
+            <button type="button" className="figma-button black" onClick={() => { closeUnlockedCard(); window.setTimeout(() => document.getElementById('impact-check')?.scrollIntoView({ behavior: 'smooth' }), 80) }}>CONTINUE TO IMPACT CHECK</button>
           </section>
         </div>
       )}
