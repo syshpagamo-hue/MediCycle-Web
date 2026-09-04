@@ -1,11 +1,18 @@
 import { useRef, useState } from 'react'
 import { quizQuestions, type QuizOption } from './data'
+import type { QuizProgress } from '../shared/progress'
 
-export function Quiz() {
+export function Quiz({
+  savedResult,
+  onComplete,
+}: {
+  savedResult: QuizProgress
+  onComplete: (score: number, total: number) => void
+}) {
   const [questionIndex, setQuestionIndex] = useState(0)
   const [selectedOptionId, setSelectedOptionId] = useState<QuizOption['id'] | null>(null)
-  const [score, setScore] = useState(0)
-  const [isComplete, setIsComplete] = useState(false)
+  const [score, setScore] = useState(savedResult.bestScore)
+  const [isComplete, setIsComplete] = useState(savedResult.completed)
   const quizCardRef = useRef<HTMLDivElement>(null)
 
   const question = quizQuestions[questionIndex]
@@ -22,6 +29,7 @@ export function Quiz() {
     if (!selectedOptionId) return
     if (questionIndex === quizQuestions.length - 1) {
       setIsComplete(true)
+      onComplete(score, quizQuestions.length)
     } else {
       setQuestionIndex((currentIndex) => currentIndex + 1)
       setSelectedOptionId(null)

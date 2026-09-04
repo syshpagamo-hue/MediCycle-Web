@@ -6,9 +6,11 @@ import {
   type DragEvent,
 } from 'react'
 import './App.css'
+import { AccountDialog } from './AccountDialog'
 import { DetectionPreview } from './DetectionPreview'
 import { PharmacyMap } from './PharmacyMap'
 import { Quiz } from './Quiz'
+import { restoreAccount, resetAccountProgress, syncAccountProgress } from './account'
 import {
   ActivityBanner,
   HeroArtwork,
@@ -29,17 +31,19 @@ import {
   type Pharmacy,
 } from './data'
 import {
-  buildOverpassQuery,
-  pharmaciesFromOverpass,
-  PHARMACY_RESULT_LIMIT,
-  SEARCH_RADII_METERS,
+  parsePharmacySearchResponse,
   sortByDistance,
-  type OverpassResponse,
 } from './pharmacy'
+import {
+  EMPTY_PROGRESS,
+  clearLocalProgress,
+  getLocalProgress,
+  mergeProgress,
+  saveLocalProgress,
+  type MediCycleProgress,
+} from './progress'
 
-const DEMO_PROGRESS_KEY = 'medicycle-demo-recycled-count'
-const LEGACY_PROGRESS_KEY = 'medicine-recycled'
-const OVERPASS_TIMEOUT_MS = 10_000
+const PHARMACY_API_TIMEOUT_MS = 40_000
 
 type CameraState =
   | 'idle'
@@ -47,21 +51,6 @@ type CameraState =
   | 'ready'
   | 'permission-denied'
   | 'unavailable'
-
-function getStoredProgress() {
-  try {
-    const storedValue =
-      window.localStorage.getItem(DEMO_PROGRESS_KEY) ??
-      window.localStorage.getItem(LEGACY_PROGRESS_KEY) ??
-      '0'
-    const stored = Number(storedValue)
-    return Number.isFinite(stored)
-      ? Math.min(Math.max(Math.floor(stored), 0), marineCards.length)
-      : 0
-  } catch {
-    return 0
-  }
-}
 
 function App() {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
@@ -88,12 +77,15 @@ function App() {
   const [searchRadiusKm, setSearchRadiusKm] = useState<number | null>(null)
   const [toast, setToast] = useState('')
   const [unlockedCard, setUnlockedCard] = useState<(typeof marineCards)[number] | null>(null)
-  const [recycledCount, setRecycledCount] = useState(getStoredProgress)
+  const [savedProgress, setSavedProgress] = useState(getLocalProgress)
+  const [accountStatus, setAccountStatus] = useState<'checking' | 'guest' | 'signed-in'>('checking')
+  const [accountOpen, setAccountOpen] = useState(false)
   const [recycledForResult, setRecycledForResult] = useState(false)
   const [returnPlanConfirmed, setReturnPlanConfirmed] = useState(false)
   const [sessionEnded, setSessionEnded] = useState(
     () => window.location.hash === pageHash.result,
   )
+  const recycledCount = savedProgress.marineCollection.length
 
   useEffect(() => {
     const onPopState = () => {
@@ -106,6 +98,36 @@ function App() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [result])
+
+  useEffect(() => {
+    let active = true
+    const localProgress = getLocalProgress()
+    void restoreAccount()
+      .then(async (remoteProgress) => {
+        if (!active) return
+        if (!remoteProgress) {
+          setAccountStatus('guest')
+          return
+        }
+        const merged = mergeProgress(remoteProgress, localProgress)
+        saveLocalProgress(merged)
+        setSavedProgress(merged)
+        setAccountStatus('signed-in')
+        if (JSON.stringify(merged) !== JSON.stringify(remoteProgress)) {
+          const synchronized = await syncAccountProgress(merged)
+          if (!active) return
+          const finalProgress = mergeProgress(merged, synchronized)
+          saveLocalProgress(finalProgress)
+          setSavedProgress(finalProgress)
+        }
+      })
+      .catch(() => {
+        if (active) setAccountStatus('guest')
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -182,6 +204,41 @@ function App() {
   const showToast = (message: string) => {
     setToast(message)
     window.setTimeout(() => setToast(''), 3400)
+  }
+
+  const applyProgress = (progress: MediCycleProgress) => {
+    setSavedProgress(progress)
+    try {
+      saveLocalProgress(progress)
+    } catch {
+      showToast('Progress could not be saved on this device.')
+    }
+  }
+
+  const persistProgress = (progress: MediCycleProgress) => {
+    applyProgress(progress)
+    if (accountStatus !== 'signed-in') return
+    void syncAccountProgress(progress)
+      .then((remoteProgress) => {
+        const merged = mergeProgress(progress, remoteProgress)
+        applyProgress(merged)
+      })
+      .catch(() => showToast('Saved on this device. Account sync will retry next time.'))
+  }
+
+  const handleAuthenticated = (progress: MediCycleProgress, created: boolean) => {
+    applyProgress(progress)
+    setAccountStatus('signed-in')
+    setAccountOpen(false)
+    showToast(created ? 'Prototype account created. Progress is synced.' : 'Signed in. Progress restored.')
+  }
+
+  const handleProgressReset = (progress: MediCycleProgress) => {
+    applyProgress(progress)
+    setRecycledForResult(false)
+    setReturnPlanConfirmed(false)
+    setUnlockedCard(null)
+    showToast('Your saved progress has been reset. Your account is still active.')
   }
 
   const stopCamera = (nextState: CameraState = 'idle') => {
@@ -351,45 +408,28 @@ function App() {
         pharmacySearchControllerRef.current = controller
         const timeoutId = window.setTimeout(
           () => controller.abort(),
-          OVERPASS_TIMEOUT_MS,
+          PHARMACY_API_TIMEOUT_MS,
         )
         try {
-          let nearby: Omit<Pharmacy, 'distance'>[] = []
-          let radiusUsed = SEARCH_RADII_METERS[SEARCH_RADII_METERS.length - 1]
-
-          for (const radius of SEARCH_RADII_METERS) {
-            const query = buildOverpassQuery(latitude, longitude, radius)
-            const response = await fetch(
-              'https://overpass-api.de/api/interpreter',
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                },
-                body: `data=${encodeURIComponent(query)}`,
-                signal: controller.signal,
-              },
-            )
-            if (response.status === 408 || response.status === 504) {
-              throw new DOMException('Map service timed out', 'AbortError')
-            }
-            if (!response.ok) throw new Error('Map service failed')
-            const data = (await response.json()) as OverpassResponse
-            nearby = pharmaciesFromOverpass(data.elements)
-            radiusUsed = radius
-            if (nearby.length >= PHARMACY_RESULT_LIMIT) break
-          }
+          const response = await fetch(
+            `/api/pharmacies?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`,
+            { signal: controller.signal, headers: { Accept: 'application/json' } },
+          )
+          if (!response.ok) throw new Error('Pharmacy proxy failed')
+          const data = parsePharmacySearchResponse(await response.json())
+          if (!data) throw new Error('Invalid pharmacy proxy response')
+          const nearby = data.pharmacies
 
           if (attempt !== pharmacySearchAttemptRef.current) return
           if (!nearby.length) {
             setLocatorState('empty')
             setMapCenter({ lat: latitude, lon: longitude })
-            setSearchRadiusKm(radiusUsed / 1000)
+            setSearchRadiusKm(data.radiusKm)
             return
           }
-          setPharmacies(sortByDistance(nearby, latitude, longitude))
+          setPharmacies(nearby)
           setMapCenter({ lat: latitude, lon: longitude })
-          setSearchRadiusKm(radiusUsed / 1000)
+          setSearchRadiusKm(data.radiusKm)
           setLocatorState('ready')
         } catch (error) {
           if (attempt !== pharmacySearchAttemptRef.current) return
@@ -420,14 +460,15 @@ function App() {
   const markAsRecycled = () => {
     if (recycledForResult || !returnPlanConfirmed) return
     const next = Math.min(recycledCount + 1, marineCards.length)
-    setRecycledCount(next)
+    const unlocked = marineCards
+      .slice(0, next)
+      .map((card) => card.name)
+    persistProgress({
+      ...savedProgress,
+      marineCollection: unlocked,
+      recycledDemoCount: savedProgress.recycledDemoCount + 1,
+    })
     setRecycledForResult(true)
-    try {
-      window.localStorage.setItem(DEMO_PROGRESS_KEY, String(next))
-      window.localStorage.removeItem(LEGACY_PROGRESS_KEY)
-    } catch {
-      showToast('Progress could not be saved on this device.')
-    }
     dialogTriggerRef.current = document.activeElement as HTMLElement | null
     setUnlockedCard(marineCards[Math.max(0, next - 1)])
   }
@@ -446,24 +487,52 @@ function App() {
     }, 80)
   }
 
-  const resetDemoProgress = () => {
+  const resetDemoProgress = async () => {
     const confirmed = window.confirm(
-      'Reset MediCycle demo progress? This only removes MediCycle demo collection data from this browser.',
+      accountStatus === 'signed-in'
+        ? 'Reset your synced MediCycle progress? Your account will remain available.'
+        : 'Reset MediCycle demo progress on this device?',
     )
     if (!confirmed) return
     try {
-      window.localStorage.removeItem(DEMO_PROGRESS_KEY)
-      window.localStorage.removeItem(LEGACY_PROGRESS_KEY)
+      const progress = accountStatus === 'signed-in'
+        ? await resetAccountProgress()
+        : structuredClone(EMPTY_PROGRESS)
+      clearLocalProgress()
+      applyProgress(progress)
     } catch {
       showToast('Demo progress could not be cleared on this device.')
       return
     }
-    setRecycledCount(0)
     setRecycledForResult(false)
     setReturnPlanConfirmed(false)
     setUnlockedCard(null)
     showToast('MediCycle demo progress has been reset.')
   }
+
+  const confirmReturnPlan = () => {
+    setReturnPlanConfirmed(true)
+    if (savedProgress.returnPlanCompleted) return
+    persistProgress({ ...savedProgress, returnPlanCompleted: true })
+  }
+
+  const recordQuizResult = (score: number, total: number) => {
+    persistProgress({
+      ...savedProgress,
+      quiz: {
+        completed: true,
+        bestScore: Math.max(savedProgress.quiz.bestScore, score),
+        total,
+      },
+    })
+  }
+
+  const canViewSamplePharmacies = [
+    'location-error',
+    'location-timeout',
+    'timeout',
+    'network-error',
+  ].includes(locatorState)
 
   const pharmacySection = (
     <section className="pharmacy-section" id="nearest-pharmacy" aria-label="Nearby pharmacies">
@@ -484,11 +553,13 @@ function App() {
         >
           {locatorState === 'locating' ? 'FINDING PHARMACIES…' : 'USE MY CURRENT LOCATION'}
         </button>
-        <button type="button" className="figma-button outline" onClick={() => showFallbackLocation()}>
-          VIEW SAMPLE PHARMACIES
-        </button>
+        {canViewSamplePharmacies && (
+          <button type="button" className="figma-button outline" onClick={() => showFallbackLocation()}>
+            VIEW SAMPLE PHARMACIES
+          </button>
+        )}
       </div>
-      <p className="location-note privacy-disclosure">Using your current location sends its coordinates to the OpenStreetMap Overpass service for this nearby search. Choose sample pharmacies to avoid sharing location.</p>
+      <p className="location-note privacy-disclosure">Your coordinates are sent to this site's Cloudflare Function, which queries OpenStreetMap Overpass providers on the server. They are not stored by MediCycle.</p>
       {locatorState === 'locating' && (
         <p className="location-note" role="status">Allow location access when your browser asks. This usually takes a few seconds.</p>
       )}
@@ -496,7 +567,7 @@ function App() {
         <p className="location-note" role="status">Live OpenStreetMap results within {searchRadiusKm} km · sorted nearest first · take-back availability is not verified</p>
       )}
       {locatorState === 'fallback' && (
-        <p className="location-note demo-note" role="status"><b>DEMO DATA</b> Showing sample pharmacies near Xitun District, Taichung.</p>
+        <p className="location-note demo-note" role="status"><b>DEMO SAMPLE DATA</b> Showing sample pharmacies near Xitun District, Taichung.</p>
       )}
       {locatorState === 'location-error' && (
         <div className="location-error" role="alert">
@@ -512,20 +583,20 @@ function App() {
       )}
       {locatorState === 'timeout' && (
         <div className="location-error" role="alert">
-          <p>The pharmacy search timed out after 10 seconds. Your connection may be slow, or the map service may be busy.</p>
+          <p>The pharmacy search timed out after trying multiple OpenStreetMap providers.</p>
           <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
         </div>
       )}
       {locatorState === 'network-error' && (
         <div className="location-error" role="alert">
-          <p>We could not reach the OpenStreetMap pharmacy search. Check your connection and try again.</p>
+          <p>All OpenStreetMap pharmacy search providers are currently unavailable.</p>
           <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
         </div>
       )}
       {locatorState === 'empty' && (
         <div className="location-error" role="status">
-          <p>No pharmacies were found within 10 km. Try again or view clearly labeled sample results to continue the demo.</p>
-          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+          <p>No pharmacies were found within 10 km.</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button></div>
         </div>
       )}
       {pharmacies.length > 0 && mapCenter && (
@@ -556,13 +627,13 @@ function App() {
                   <div className="pharmacy-number">{String(index + 1).padStart(2, '0')}</div>
                   <div className="pharmacy-copy">
                     <h3>{pharmacy.name}</h3>
-                    <p>{pharmacy.address}</p>
+                    {pharmacy.address && <p>{pharmacy.address}</p>}
                     {pharmacy.phone && <small>Phone: {pharmacy.phone}</small>}
                     {pharmacy.openingHours && <small>Hours: {pharmacy.openingHours}</small>}
                     <small className={`verification-label is-${pharmacy.takeBackStatus}`}>
                       {pharmacy.takeBackStatus === 'osm-listed'
-                        ? 'OSM-LISTED DRUG RECYCLING · NOT OFFICIALLY VERIFIED · CONTACT PHARMACY TO CONFIRM'
-                        : 'UNVERIFIED MEDICATION TAKE-BACK · CONTACT PHARMACY TO CONFIRM'}
+                        ? 'OSM-listed drug recycling · contact pharmacy to confirm'
+                        : 'Unverified medication take-back — contact pharmacy to confirm'}
                     </small>
                   </div>
                   <div className="pharmacy-actions">
@@ -587,7 +658,7 @@ function App() {
               <button
                 type="button"
                 className={`figma-button ${returnPlanConfirmed ? 'gray' : 'black'}`}
-                onClick={() => setReturnPlanConfirmed(true)}
+                onClick={confirmReturnPlan}
                 disabled={returnPlanConfirmed}
               >
                 {returnPlanConfirmed ? '✓ PLAN RECORDED' : 'I WILL CONTACT A PHARMACY'}
@@ -601,7 +672,28 @@ function App() {
 
   return (
     <main className="figma-site">
-      <SiteHeader page={page} recycledCount={recycledCount} onNavigate={navigate} onSection={goToSection} />
+      <SiteHeader
+        page={page}
+        recycledCount={recycledCount}
+        accountStatus={accountStatus}
+        onNavigate={navigate}
+        onSection={goToSection}
+        onAccount={() => setAccountOpen(true)}
+      />
+
+      <AccountDialog
+        open={accountOpen}
+        signedIn={accountStatus === 'signed-in'}
+        progress={savedProgress}
+        onClose={() => setAccountOpen(false)}
+        onAuthenticated={handleAuthenticated}
+        onLoggedOut={() => {
+          setAccountStatus('guest')
+          setAccountOpen(false)
+          showToast('Logged out. Progress remains saved on this device and in your account.')
+        }}
+        onProgressReset={handleProgressReset}
+      />
 
       {page === 'home' && (
         <div className="page-shell landing-page">
@@ -767,7 +859,13 @@ function App() {
             </button>
           </div>
 
-          {recycledForResult && <Quiz />}
+          {recycledForResult && (
+            <Quiz
+              key={`${savedProgress.quiz.completed}-${savedProgress.quiz.bestScore}`}
+              savedResult={savedProgress.quiz}
+              onComplete={recordQuizResult}
+            />
+          )}
         </div>
       )}
 

@@ -11,7 +11,7 @@ export type Pharmacy = {
   name: string
   lat: number
   lon: number
-  address: string
+  address?: string
   phone?: string
   openingHours?: string
   distance: number

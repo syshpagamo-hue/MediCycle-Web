@@ -3,7 +3,7 @@ import type { Pharmacy } from './data'
 export const SEARCH_RADII_METERS = [2_000, 5_000, 10_000] as const
 export const PHARMACY_RESULT_LIMIT = 5
 
-type OverpassElement = {
+export type OverpassElement = {
   type: 'node' | 'way' | 'relation'
   id: number
   lat?: number
@@ -14,6 +14,36 @@ type OverpassElement = {
 
 export type OverpassResponse = {
   elements: OverpassElement[]
+}
+
+export type PharmacySearchResponse = {
+  pharmacies: Pharmacy[]
+  radiusKm: number
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function parsePharmacySearchResponse(
+  value: unknown,
+): PharmacySearchResponse | null {
+  if (!isRecord(value) || !Array.isArray(value.pharmacies)) return null
+  if (typeof value.radiusKm !== 'number' || !Number.isFinite(value.radiusKm)) return null
+  const pharmacies = value.pharmacies.filter((item): item is Pharmacy => {
+    if (!isRecord(item)) return false
+    return (
+      typeof item.id === 'string' &&
+      typeof item.name === 'string' &&
+      typeof item.lat === 'number' &&
+      typeof item.lon === 'number' &&
+      (item.address === undefined || typeof item.address === 'string') &&
+      typeof item.distance === 'number' &&
+      (item.takeBackStatus === 'osm-listed' || item.takeBackStatus === 'unverified')
+    )
+  })
+  if (pharmacies.length !== value.pharmacies.length) return null
+  return { pharmacies, radiusKm: value.radiusKm }
 }
 
 export function haversine(
@@ -62,7 +92,7 @@ function addressFromTags(tags: Record<string, string>) {
       tags['addr:postcode'],
     ]
       .filter(Boolean)
-      .join(', ') || 'Address not listed in OpenStreetMap'
+      .join(', ') || undefined
   )
 }
 

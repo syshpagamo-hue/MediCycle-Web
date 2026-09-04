@@ -99,8 +99,7 @@ export function PharmacyMap({
               {pharmacy.distance < 1
                 ? `${Math.round(pharmacy.distance * 1000)} m away`
                 : `${pharmacy.distance.toFixed(1)} km away`}
-              <br />
-              <span>{pharmacy.address}</span>
+              {pharmacy.address && <><br /><span>{pharmacy.address}</span></>}
             </Popup>
           </Marker>
         ))}

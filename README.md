@@ -28,10 +28,11 @@ Completing the guided disposal simulation unlocks marine life cards, making the 
 - **Camera and upload** — supports camera capture, file selection, drag-and-drop, local preview, file-type validation, and a 10 MB size limit. In the current prototype, selected images remain on the device and are not analyzed or uploaded.
 - **AI medication-recognition pipeline** — includes a browser-side YOLO11 ONNX inference module with image decoding, letterboxing, WebGPU/WASM execution, output parsing, confidence filtering, and non-maximum suppression. The production model and validated class-to-guidance connection are not enabled yet.
 - **Disposal guidance** — explains the recommended action, why it matters, and the steps required for a safer medication hand-off.
-- **Nearby pharmacies** — uses browser geolocation, OpenStreetMap Overpass data, and an interactive Leaflet map, with sample data available for a reliable demo. Pharmacy take-back participation is not assumed; users are told to contact each location to verify it.
+- **Nearby pharmacies** — sends browser geolocation to a same-origin Cloudflare Pages Function, which validates coordinates and queries multiple OpenStreetMap Overpass providers before returning normalized nearest-first results to the Leaflet map.
 - **Marine Life collection** — rewards simulated completion with six unlockable species cards and environmental impact stories.
 - **Six-question Quiz** — checks understanding of pharmaceutical pollution, responsible disposal, aquatic impact, and AI's intended role.
-- **Local progress** — stores the marine collection count in `localStorage`; no account or application database is required for the prototype.
+- **Prototype account** — uses a phone number and six-digit PIN (not SMS verification) to restore progress across devices. Phone and PIN values are never stored in plaintext; D1 stores a keyed phone hash and a salted PBKDF2 PIN derivation.
+- **Resilient progress** — synchronizes Marine Life, Quiz, return-plan, and demo-completion progress to Cloudflare D1 while retaining `localStorage` as an offline fallback.
 
 ## How It Works
 
@@ -52,11 +53,14 @@ flowchart LR
     B --> D[Demo Mode<br/>Fixed Ethinyl Estradiol case]
     C -. Future validated class mapping .-> E[Disposal guidance]
     D --> E
-    E --> F[OpenStreetMap Overpass]
-    F --> G[Leaflet / react-leaflet]
+    E --> F[Cloudflare Pages Function]
+    F --> L[OpenStreetMap Overpass<br/>multi-endpoint fallback]
+    L --> G[Leaflet / react-leaflet]
     G --> H[Return plan + simulated completion]
     H --> I[Marine Life collection + Quiz]
-    I --> J[localStorage progress]
+    I --> J[localStorage fallback]
+    I --> M[Prototype account API]
+    M --> N[Cloudflare D1]
     A --> K[Cloudflare Pages]
 ```
 
@@ -71,8 +75,9 @@ The UI currently follows the solid Demo Mode path. `src/inference/yolo.ts` provi
 | Build tool | Vite | Local development and optimized static production build |
 | Hosting | Cloudflare Pages | Static deployment from the GitHub `main` branch |
 | Mapping | Leaflet + react-leaflet | Interactive pharmacy map, markers, popups, and map focus |
-| Location data | OpenStreetMap Overpass API | Searches nearby `amenity=pharmacy` records |
-| Browser persistence | `localStorage` | Stores Marine Life collection progress on the current device |
+| Location data | Pages Function + OpenStreetMap Overpass | Validates coordinates, expands 2/5/10 km, retries public instances, normalizes and sorts results |
+| Account persistence | Cloudflare D1 | Stores hashed account credentials, sessions, and cross-device progress |
+| Offline persistence | `localStorage` | Stores non-identifying progress on the current device; never stores the phone number |
 | Future browser inference | ONNX Runtime Web | WebGPU-first inference with a WASM fallback; module present, production model not enabled |
 | Future vision model | YOLO11 ONNX | Planned medication detection model; still being trained and validated |
 
@@ -85,8 +90,9 @@ MediCycle is a **prototype / competition demo**, not a production medical identi
 | Responsive UX and guided demo flow | Complete for the prototype |
 | Camera/upload preview | Complete; preview-only and local |
 | Fixed disposal-guidance case | Complete |
-| Nearby-pharmacy search and Leaflet map | Complete; take-back availability remains unverified |
-| Marine Life collection and `localStorage` progress | Complete |
+| Nearby-pharmacy proxy and Leaflet map | Implemented; requires Pages Functions deployment; take-back availability remains unverified |
+| Prototype account and D1 progress sync | Implemented; requires the D1 binding, migration, and pepper secret described below |
+| Marine Life collection and offline progress | Complete |
 | Six-question Quiz, scoring, and restart | Complete |
 | ONNX preprocessing and inference module | Implemented for future integration |
 | Production YOLO11 medication model | In training / validation; not included in this repository |
@@ -110,11 +116,11 @@ npm run build
 npm run lint
 ```
 
-The local development server uses Vite. The production build is written to `dist/`.
+The Vite server is sufficient for UI-only work. The production build is written to `dist/`. To run the account and pharmacy APIs locally, copy `wrangler.local.jsonc` to `wrangler.jsonc` without committing it, add a local `PHONE_HASH_PEPPER` (at least 24 random characters) to `.dev.vars`, apply `migrations/0001_accounts_and_progress.sql`, and run `npx wrangler pages dev`. Both `.dev.vars` and Wrangler's local D1 state are ignored by Git.
 
 ## Deployment
 
-Cloudflare Pages automatically deploys updates from the GitHub `main` branch.
+Cloudflare Pages automatically deploys updates from the GitHub `main` branch. The Pages project needs a D1 binding and secret before the new APIs can serve account requests.
 
 | Setting | Value |
 | --- | --- |
@@ -122,7 +128,26 @@ Cloudflare Pages automatically deploys updates from the GitHub `main` branch.
 | Build command | `npm run build` |
 | Build output directory | `dist` |
 
-The application is a static client-side build. OpenStreetMap tiles and Overpass pharmacy results are requested by the browser at runtime.
+### Required Cloudflare configuration
+
+1. Create a D1 database named `medicycle-progress`.
+2. Open its Console and execute `migrations/0001_accounts_and_progress.sql`.
+3. In the MediCycle Pages project's production and preview settings, add a D1 binding named exactly `DB` and select `medicycle-progress`.
+4. Add an encrypted secret named exactly `PHONE_HASH_PEPPER` to production and preview. Use a cryptographically random value of at least 32 bytes and never put it in Git or frontend environment variables.
+5. Set the Pages compatibility date to `2026-09-04` or newer and enable `nodejs_compat` for production and preview.
+6. Keep the existing build command `npm run build`, output directory `dist`, and production branch `main`, then trigger a new deployment.
+
+### Pages Function endpoints
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/auth/register` | `POST` | Create a prototype account and merge device progress |
+| `/api/auth/login` | `POST` | Verify phone + PIN, create an HttpOnly session, and merge/restore progress |
+| `/api/auth/logout` | `POST` | Revoke only the current session; saved progress remains |
+| `/api/progress` | `GET` | Restore the signed-in user's progress |
+| `/api/progress` | `PUT` | Merge and save progress |
+| `/api/progress` | `DELETE` | Reset progress without deleting the account |
+| `/api/pharmacies?lat=…&lon=…` | `GET` | Return normalized nearest pharmacies through the server-side Overpass fallback |
 
 ## Model Integration Notes
 

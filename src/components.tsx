@@ -4,13 +4,17 @@ import { marineCards } from './data'
 export function SiteHeader({
   page,
   recycledCount,
+  accountStatus,
   onNavigate,
   onSection,
+  onAccount,
 }: {
   page: PageName
   recycledCount: number
+  accountStatus: 'checking' | 'guest' | 'signed-in'
   onNavigate: (page: PageName) => void
   onSection: (id: string) => void
+  onAccount: () => void
 }) {
   return (
     <header className="site-header">
@@ -29,15 +33,26 @@ export function SiteHeader({
           <button type="button" onClick={() => onSection('impact')}>Why it matters</button>
           <button type="button" onClick={() => onSection('nearest-pharmacy')}>Find a pharmacy</button>
         </nav>
-        <button
-          type="button"
-          className={`collection-pill${page === 'activity' ? ' is-active' : ''}`}
-          onClick={() => onNavigate('activity')}
-          aria-label={`Open ocean collection, ${recycledCount} of ${marineCards.length} cards unlocked`}
-        >
-          <span>My Ocean</span>
-          <b>{recycledCount}/{marineCards.length}</b>
-        </button>
+        <div className="header-actions">
+          <button
+            type="button"
+            className={`account-pill${accountStatus === 'signed-in' ? ' is-signed-in' : ''}`}
+            onClick={onAccount}
+            aria-label={accountStatus === 'signed-in' ? 'Open MediCycle account, signed in' : 'Open MediCycle prototype account'}
+          >
+            <i aria-hidden="true" />
+            <span>{accountStatus === 'signed-in' ? 'Synced' : 'Account'}</span>
+          </button>
+          <button
+            type="button"
+            className={`collection-pill${page === 'activity' ? ' is-active' : ''}`}
+            onClick={() => onNavigate('activity')}
+            aria-label={`Open ocean collection, ${recycledCount} of ${marineCards.length} cards unlocked`}
+          >
+            <span>My Ocean</span>
+            <b>{recycledCount}/{marineCards.length}</b>
+          </button>
+        </div>
       </div>
     </header>
   )
