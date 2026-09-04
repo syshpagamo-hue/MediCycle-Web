@@ -1227,7 +1227,7 @@ button:disabled {
 }
 
 .pharmacy-map .leaflet-tile-pane {
-  filter: saturate(0.62) contrast(0.88) brightness(1.035);
+  filter: grayscale(0.24) saturate(0.48) contrast(0.82) brightness(1.12);
 }
 
 .pharmacy-map .leaflet-container::after {
