@@ -1,5 +1,5 @@
 const encoder = new TextEncoder()
-const PIN_ITERATIONS = 120_000
+const PIN_ITERATIONS = 100_000
 
 function bytesToBase64Url(bytes: Uint8Array) {
   let binary = ''
@@ -32,7 +32,9 @@ export function isValidPin(value: unknown): value is string {
 }
 
 export async function hashPhone(phone: string, pepper: string) {
-  if (pepper.length < 24) throw new Error('PHONE_HASH_PEPPER is not configured')
+  if (!pepper || pepper.length < 24) {
+    throw new Error('PHONE_HASH_PEPPER is not configured')
+  }
   const key = await crypto.subtle.importKey(
     'raw',
     encoder.encode(pepper),
