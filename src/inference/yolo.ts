@@ -1,5 +1,10 @@
 import * as ort from 'onnxruntime-web/webgpu'
 import { MEDICYCLE_CLASS_NAMES } from '../medicineMeta'
+import {
+  createLetterboxTransform,
+  restoreLetterboxBox,
+  type LetterboxTransform,
+} from '../bboxMapping'
 
 export { MEDICYCLE_CLASS_NAMES } from '../medicineMeta'
 
@@ -40,16 +45,6 @@ type LoadedModel = {
   session: ort.InferenceSession
   backend: InferenceBackend
   labels: string[]
-}
-
-type LetterboxTransform = {
-  imageWidth: number
-  imageHeight: number
-  inputWidth: number
-  inputHeight: number
-  scale: number
-  padX: number
-  padY: number
 }
 
 type Candidate = Detection & {
@@ -148,8 +143,6 @@ function assertInputContract(session: ort.InferenceSession) {
 }
 
 async function decodeImage(file: File) {
-  if ('createImageBitmap' in window) return createImageBitmap(file)
-
   const url = URL.createObjectURL(file)
   try {
     const image = new Image()
@@ -167,13 +160,14 @@ async function preprocessImage(
   inputHeight: number,
 ) {
   const image = await decodeImage(file)
-  const imageWidth = image.width
-  const imageHeight = image.height
-  const scale = Math.min(inputWidth / imageWidth, inputHeight / imageHeight)
-  const resizedWidth = Math.round(imageWidth * scale)
-  const resizedHeight = Math.round(imageHeight * scale)
-  const padX = (inputWidth - resizedWidth) / 2
-  const padY = (inputHeight - resizedHeight) / 2
+  // HTMLImageElement uses the same browser auto-orientation path as the
+  // preview <img>. This keeps EXIF-rotated uploads in one coordinate system.
+  const imageWidth = image.naturalWidth
+  const imageHeight = image.naturalHeight
+  const transform = createLetterboxTransform(
+    { width: imageWidth, height: imageHeight },
+    { width: inputWidth, height: inputHeight },
+  )
 
   const canvas = document.createElement('canvas')
   canvas.width = inputWidth
@@ -183,8 +177,13 @@ async function preprocessImage(
 
   context.fillStyle = 'rgb(114, 114, 114)'
   context.fillRect(0, 0, inputWidth, inputHeight)
-  context.drawImage(image, padX, padY, resizedWidth, resizedHeight)
-  if (image instanceof ImageBitmap) image.close()
+  context.drawImage(
+    image,
+    transform.padX,
+    transform.padY,
+    imageWidth * transform.scale,
+    imageHeight * transform.scale,
+  )
 
   const pixels = context.getImageData(0, 0, inputWidth, inputHeight).data
   const planeSize = inputWidth * inputHeight
@@ -198,34 +197,8 @@ async function preprocessImage(
 
   return {
     tensor: new ort.Tensor('float32', tensorData, [1, 3, inputHeight, inputWidth]),
-    transform: {
-      imageWidth,
-      imageHeight,
-      inputWidth,
-      inputHeight,
-      scale,
-      padX,
-      padY,
-    } satisfies LetterboxTransform,
+    transform,
   }
-}
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum)
-}
-
-function restoreBox(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  transform: LetterboxTransform,
-) {
-  const left = clamp((x1 - transform.padX) / transform.scale, 0, transform.imageWidth)
-  const top = clamp((y1 - transform.padY) / transform.scale, 0, transform.imageHeight)
-  const right = clamp((x2 - transform.padX) / transform.scale, 0, transform.imageWidth)
-  const bottom = clamp((y2 - transform.padY) / transform.scale, 0, transform.imageHeight)
-  return { left, top, right, bottom }
 }
 
 function labelFor(classId: number, labels: string[]) {
@@ -296,24 +269,24 @@ function parseRawOutput(
       height *= transform.inputHeight
     }
 
-    const box = restoreBox(
+    const box = restoreLetterboxBox(
       centerX - width / 2,
       centerY - height / 2,
       centerX + width / 2,
       centerY + height / 2,
       transform,
     )
-    if (box.right <= box.left || box.bottom <= box.top) continue
+    if (box.width <= 0 || box.height <= 0) continue
     candidates.push({
       classId,
       label: labelFor(classId, labels),
       confidence,
-      x: box.left,
-      y: box.top,
-      width: box.right - box.left,
-      height: box.bottom - box.top,
-      x2: box.right,
-      y2: box.bottom,
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+      x2: box.x + box.width,
+      y2: box.y + box.height,
     })
   }
   return candidates
@@ -348,18 +321,18 @@ function parseEndToEndOutput(
       y1 *= transform.inputHeight
       y2 *= transform.inputHeight
     }
-    const box = restoreBox(x1, y1, x2, y2, transform)
-    if (box.right <= box.left || box.bottom <= box.top) continue
+    const box = restoreLetterboxBox(x1, y1, x2, y2, transform)
+    if (box.width <= 0 || box.height <= 0) continue
     candidates.push({
       classId,
       label: labelFor(classId, labels),
       confidence,
-      x: box.left,
-      y: box.top,
-      width: box.right - box.left,
-      height: box.bottom - box.top,
-      x2: box.right,
-      y2: box.bottom,
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+      x2: box.x + box.width,
+      y2: box.y + box.height,
     })
   }
   return candidates

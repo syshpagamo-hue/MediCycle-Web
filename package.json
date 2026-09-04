@@ -8,6 +8,7 @@
     "build": "tsc -p functions/tsconfig.json --noEmit && tsc -b && vite build",
     "lint": "oxlint",
     "sanity:inference": "node scripts/inference-sanity.mjs",
+    "sanity:bbox": "node --experimental-strip-types scripts/bbox-mapping-sanity.mjs",
     "sanity:medicine-meta": "node --experimental-strip-types scripts/medicine-meta-sanity.mjs",
     "sanity:labels": "node --experimental-strip-types scripts/label-layout-sanity.mjs",
     "sanity:overlay": "node --experimental-strip-types scripts/overlay-stability-sanity.mjs",

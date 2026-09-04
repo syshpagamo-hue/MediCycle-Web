@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Detection } from './inference/yolo'
+import { createContainTransform, projectOriginalBox } from './bboxMapping'
 import { layoutDetectionLabels, type LayoutRect } from './detectionLabelLayout'
 import {
   normalizeOverlaySize,
@@ -42,21 +43,18 @@ export function DetectionPreview({
     const context = canvas.getContext('2d')
     if (!context) return
 
-    const imageScale = Math.min(width / image.naturalWidth, height / image.naturalHeight)
-    const renderedWidth = image.naturalWidth * imageScale
-    const renderedHeight = image.naturalHeight * imageScale
-    const offsetX = (width - renderedWidth) / 2
-    const offsetY = (height - renderedHeight) / 2
+    // Detection coordinates are always in the auto-oriented original image.
+    // Project them to the CSS viewport exactly once, matching object-fit: contain.
+    const projection = createContainTransform(
+      { width: image.naturalWidth, height: image.naturalHeight },
+      { width, height },
+    )
+    const { offsetX, offsetY, renderedWidth, renderedHeight } = projection
 
     const boxes = detections.map((detection, index) => ({
       detection,
       index,
-      rect: {
-        x: offsetX + detection.x * imageScale,
-        y: offsetY + detection.y * imageScale,
-        width: detection.width * imageScale,
-        height: detection.height * imageScale,
-      },
+      rect: projectOriginalBox(detection, projection),
     }))
     const fontSize = Math.max(12, Math.min(16, width / 38))
     const labelHeight = fontSize + 8
