@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Detection } from './inference/yolo'
+import { layoutDetectionLabels, type LayoutRect } from './detectionLabelLayout'
 
 const colors = ['#5eb7dd', '#ff8a3d', '#ffce54', '#745bd8', '#20a67a', '#e6537c']
 
@@ -15,6 +16,7 @@ export function DetectionPreview({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [denseMode, setDenseMode] = useState(false)
 
   const draw = useCallback(() => {
     const wrapper = wrapperRef.current
@@ -41,27 +43,79 @@ export function DetectionPreview({
     const offsetX = (width - renderedWidth) / 2
     const offsetY = (height - renderedHeight) / 2
 
-    detections.forEach((detection) => {
-      const color = colors[detection.classId % colors.length]
-      const x = offsetX + detection.x * imageScale
-      const y = offsetY + detection.y * imageScale
-      const boxWidth = detection.width * imageScale
-      const boxHeight = detection.height * imageScale
-      const label = `${detection.label} ${(detection.confidence * 100).toFixed(1)}%`
+    const boxes = detections.map((detection, index) => ({
+      detection,
+      index,
+      rect: {
+        x: offsetX + detection.x * imageScale,
+        y: offsetY + detection.y * imageScale,
+        width: detection.width * imageScale,
+        height: detection.height * imageScale,
+      },
+    }))
+    const fontSize = Math.max(12, Math.min(16, width / 38))
+    const labelHeight = fontSize + 8
+    const horizontalPadding = 5
+    context.font = `600 ${fontSize}px Arial, sans-serif`
 
+    const layout = layoutDetectionLabels(
+      boxes.map(({ detection, index, rect }) => ({
+        id: index,
+        priority: detection.confidence,
+        anchor: rect,
+        width: context.measureText(`${detection.label} ${(detection.confidence * 100).toFixed(1)}%`).width + horizontalPadding * 2,
+        height: labelHeight,
+      })),
+      { x: offsetX, y: offsetY, width: renderedWidth, height: renderedHeight },
+    )
+    const shouldUseDenseMode = detections.length > 0 && layout === null
+    setDenseMode((current) => current === shouldUseDenseMode ? current : shouldUseDenseMode)
+
+    boxes.forEach(({ detection, rect }) => {
+      const color = colors[detection.classId % colors.length]
       context.strokeStyle = color
       context.lineWidth = Math.max(2, width / 320)
-      context.strokeRect(x, y, boxWidth, boxHeight)
-      context.font = `600 ${Math.max(12, width / 38)}px Arial, sans-serif`
-      const textWidth = context.measureText(label).width
-      const labelHeight = Math.max(22, width / 22)
-      const labelY = Math.max(0, y - labelHeight)
-      context.fillStyle = color
-      context.fillRect(x, labelY, textWidth + 14, labelHeight)
-      context.fillStyle = '#050505'
-      context.textBaseline = 'middle'
-      context.fillText(label, x + 7, labelY + labelHeight / 2)
+      context.strokeRect(rect.x, rect.y, rect.width, rect.height)
     })
+
+    if (layout) {
+      layout.forEach(({ id, rect, connector }) => {
+        const detection = detections[id]
+        const color = colors[detection.classId % colors.length]
+        const label = `${detection.label} ${(detection.confidence * 100).toFixed(1)}%`
+
+        context.beginPath()
+        context.moveTo(connector.fromX, connector.fromY)
+        context.lineTo(connector.toX, connector.toY)
+        context.strokeStyle = color
+        context.lineWidth = Math.max(1.5, width / 480)
+        context.stroke()
+        context.fillStyle = color
+        context.fillRect(rect.x, rect.y, rect.width, rect.height)
+        context.fillStyle = '#050505'
+        context.textBaseline = 'middle'
+        context.fillText(label, rect.x + horizontalPadding, rect.y + rect.height / 2)
+      })
+    } else {
+      boxes.forEach(({ detection, index, rect }) => {
+        const color = colors[detection.classId % colors.length]
+        const badgeSize = Math.max(18, Math.min(24, width / 20))
+        const badge: LayoutRect = {
+          x: Math.min(Math.max(rect.x, offsetX), offsetX + renderedWidth - badgeSize),
+          y: Math.min(Math.max(rect.y, offsetY), offsetY + renderedHeight - badgeSize),
+          width: badgeSize,
+          height: badgeSize,
+        }
+        context.fillStyle = color
+        context.fillRect(badge.x, badge.y, badge.width, badge.height)
+        context.fillStyle = '#050505'
+        context.font = `700 ${Math.max(11, badgeSize * 0.55)}px Arial, sans-serif`
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        context.fillText(String(index + 1), badge.x + badge.width / 2, badge.y + badge.height / 2)
+      })
+      context.textAlign = 'start'
+    }
   }, [detections])
 
   useEffect(() => {
@@ -74,9 +128,22 @@ export function DetectionPreview({
   }, [draw, src])
 
   return (
-    <div className="annotated-image" ref={wrapperRef}>
-      <img ref={imageRef} src={src} alt={alt} onLoad={draw} />
-      <canvas ref={canvasRef} aria-hidden="true" />
+    <div className="annotated-image">
+      <div className="annotated-image-stage" ref={wrapperRef}>
+        <img ref={imageRef} src={src} alt={alt} onLoad={draw} />
+        <canvas ref={canvasRef} aria-hidden="true" />
+      </div>
+      {denseMode && (
+        <ol className="detection-legend" aria-label="Detection labels">
+          {detections.map((detection, index) => (
+            <li key={`${detection.classId}-${index}`}>
+              <span style={{ backgroundColor: colors[detection.classId % colors.length] }}>{index + 1}</span>
+              <b>{detection.label}</b>
+              <small>{(detection.confidence * 100).toFixed(1)}%</small>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   )
 }

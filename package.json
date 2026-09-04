@@ -8,6 +8,7 @@
     "build": "tsc -p functions/tsconfig.json --noEmit && tsc -b && vite build",
     "lint": "oxlint",
     "sanity:inference": "node scripts/inference-sanity.mjs",
+    "sanity:labels": "node --experimental-strip-types scripts/label-layout-sanity.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
