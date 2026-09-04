@@ -12,19 +12,24 @@ type PharmacyMapProps = {
 }
 
 const userIcon = divIcon({
-  className: 'map-marker-shell',
-  html: '<span class="map-marker user-marker" aria-hidden="true"></span>',
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  className: 'map-marker-shell user-marker-shell',
+  html: '<span class="user-location-marker" aria-hidden="true"><span class="user-location-pulse"></span><span class="user-location-core"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3.25 19.4 19l-7.4-3.1L4.6 19 12 3.25Z"/></svg></span></span>',
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -20],
 })
 
-const pharmacyIcon = divIcon({
-  className: 'map-marker-shell',
-  html: '<span class="map-marker pharmacy-marker" aria-hidden="true">+</span>',
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-  popupAnchor: [0, -16],
-})
+function createPharmacyIcon(index: number, isSelected: boolean) {
+  const number = String(index + 1).padStart(2, '0')
+
+  return divIcon({
+    className: `map-marker-shell pharmacy-marker-shell${isSelected ? ' is-selected' : ''}`,
+    html: `<span class="pharmacy-map-marker" aria-hidden="true"><span class="pharmacy-marker-cross">+</span><span class="pharmacy-marker-number">${number}</span></span>`,
+    iconSize: [42, 50],
+    iconAnchor: [21, 46],
+    popupAnchor: [0, -44],
+  })
+}
 
 function MapFocus({
   center,
@@ -72,6 +77,10 @@ export function PharmacyMap({
 
   return (
     <div className="pharmacy-map" aria-label="Interactive map of nearby pharmacies">
+      <div className="pharmacy-map-status" aria-hidden="true">
+        <span><i /> Nearby network</span>
+        <b>{String(pharmacies.length).padStart(2, '0')} locations</b>
+      </div>
       <MapContainer
         center={[center.lat, center.lon]}
         zoom={14}
@@ -81,17 +90,19 @@ export function PharmacyMap({
         }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
         />
         <Marker position={[center.lat, center.lon]} icon={userIcon}>
           <Popup>{centerLabel}</Popup>
         </Marker>
-        {pharmacies.map((pharmacy) => (
+        {pharmacies.map((pharmacy, index) => (
           <Marker
             key={pharmacy.id}
             position={[pharmacy.lat, pharmacy.lon]}
-            icon={pharmacyIcon}
+            icon={createPharmacyIcon(index, pharmacy.id === selectedPharmacyId)}
+            title={pharmacy.name}
+            zIndexOffset={pharmacy.id === selectedPharmacyId ? 1000 : 0}
             eventHandlers={{ click: () => onSelectPharmacy(pharmacy.id) }}
           >
             <Popup>

@@ -1191,19 +1191,134 @@ button:disabled {
   top: 100px;
   overflow: hidden;
   height: 560px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--blue-light);
+  border: 1px solid rgb(18 38 50 / 12%);
+  border-radius: 20px;
+  background: #edf3f5;
+  box-shadow: 0 22px 55px rgb(34 65 79 / 10%), 0 3px 12px rgb(34 65 79 / 6%);
+  isolation: isolate;
 }
 
 .pharmacy-map .leaflet-container {
   width: 100%;
   height: 100%;
+  background: #edf3f5;
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.pharmacy-map .leaflet-control-attribution {
+.pharmacy-map .leaflet-tile-pane {
+  filter: saturate(0.62) contrast(0.88) brightness(1.035);
+}
+
+.pharmacy-map .leaflet-container::after {
+  position: absolute;
+  z-index: 420;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(72 133 157 / 3.5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(72 133 157 / 3.5%) 1px, transparent 1px);
+  background-size: 32px 32px;
+  content: '';
+  pointer-events: none;
+}
+
+.pharmacy-map-status {
+  position: absolute;
+  z-index: 600;
+  top: 16px;
+  right: 16px;
+  left: 56px;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgb(18 38 50 / 10%);
+  border-radius: 12px;
+  padding: 0 14px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 8px 24px rgb(34 65 79 / 9%);
+  color: #314852;
   font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.pharmacy-map-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.pharmacy-map-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #72bedf;
+  box-shadow: 0 0 0 4px rgb(114 190 223 / 16%);
+}
+
+.pharmacy-map-status b {
+  color: #78909a;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.pharmacy-map .leaflet-control-attribution {
+  border-radius: 8px 0 0;
+  background: rgb(255 255 255 / 74%);
+  color: #78909a;
+  font-size: 8px;
+  backdrop-filter: blur(8px);
+}
+
+.pharmacy-map .leaflet-control-attribution a {
+  color: #55717d;
+}
+
+.pharmacy-map .leaflet-control-zoom {
+  overflow: hidden;
+  border: 1px solid rgb(18 38 50 / 11%);
+  border-radius: 11px;
+  box-shadow: 0 7px 20px rgb(34 65 79 / 10%);
+}
+
+.pharmacy-map .leaflet-control-zoom a {
+  width: 34px;
+  height: 34px;
+  border-color: rgb(18 38 50 / 8%);
+  background: rgb(255 255 255 / 91%);
+  color: #314852;
+  font-size: 17px;
+  line-height: 32px;
+  backdrop-filter: blur(10px);
+}
+
+.pharmacy-map .leaflet-popup-content-wrapper,
+.pharmacy-map .leaflet-popup-tip {
+  background: rgb(255 255 255 / 96%);
+  color: #4d626b;
+  box-shadow: 0 14px 36px rgb(34 65 79 / 18%);
+}
+
+.pharmacy-map .leaflet-popup-content-wrapper {
+  border: 1px solid rgb(18 38 50 / 9%);
+  border-radius: 13px;
+}
+
+.pharmacy-map .leaflet-popup-content {
+  margin: 14px 17px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.pharmacy-map .leaflet-popup-content strong {
+  color: #132931;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .map-marker-shell {
@@ -1211,25 +1326,106 @@ button:disabled {
   background: transparent;
 }
 
-.map-marker {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  border: 3px solid #fff;
+.user-location-marker {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 44px;
+}
+
+.user-location-pulse {
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgb(16 41 52 / 16%);
   border-radius: 50%;
-  box-shadow: 0 2px 9px rgb(0 0 0 / 28%);
+  background: rgb(157 212 236 / 20%);
+  box-shadow: 0 5px 16px rgb(34 65 79 / 15%);
 }
 
-.map-marker.pharmacy-marker {
-  background: var(--figma-blue);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
+.user-location-pulse::after {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgb(16 41 52 / 10%);
+  border-radius: inherit;
+  content: '';
 }
 
-.map-marker.user-marker {
-  background: #111;
+.user-location-core {
+  position: absolute;
+  inset: 11px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #102934;
+  box-shadow: 0 3px 9px rgb(15 39 49 / 28%);
+}
+
+.user-location-core svg {
+  width: 11px;
+  height: 11px;
+  fill: #9dd4ec;
+  transform: translateY(-0.5px);
+}
+
+.pharmacy-map-marker {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 2px solid rgb(255 255 255 / 96%);
+  border-radius: 13px 13px 13px 3px;
+  background: #fff;
+  box-shadow: 0 8px 19px rgb(35 76 94 / 20%), 0 2px 5px rgb(35 76 94 / 12%);
+  transform: rotate(-45deg);
+  transform-origin: 50% 50%;
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.pharmacy-marker-cross,
+.pharmacy-marker-number {
+  position: absolute;
+  transform: rotate(45deg);
+}
+
+.pharmacy-marker-cross {
+  top: 7px;
+  left: 7px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 6px;
+  background: #dff2fa;
+  color: #347d9d;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.pharmacy-marker-number {
+  right: 5px;
+  bottom: 4px;
+  color: #66818c;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.pharmacy-marker-shell.is-selected .pharmacy-map-marker {
+  background: #102934;
+  box-shadow: 0 0 0 5px rgb(157 212 236 / 30%), 0 12px 25px rgb(25 62 77 / 28%);
+  transform: rotate(-45deg) scale(1.12);
+}
+
+.pharmacy-marker-shell.is-selected .pharmacy-marker-cross {
+  background: #9dd4ec;
+  color: #102934;
+}
+
+.pharmacy-marker-shell.is-selected .pharmacy-marker-number {
+  color: #dceaf0;
 }
 
 .pharmacy-list {
@@ -1244,15 +1440,30 @@ button:disabled {
   padding: 28px 0;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
-  transition: background 150ms ease, padding 150ms ease;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, padding 150ms ease;
 }
 
 .pharmacy-row:hover,
-.pharmacy-row.is-selected,
 .pharmacy-row:focus-visible {
   padding-right: 12px;
   padding-left: 12px;
   background: #f4fafc;
+}
+
+.pharmacy-row.is-selected {
+  padding-right: 12px;
+  padding-left: 12px;
+  border-bottom-color: rgb(86 162 194 / 34%);
+  background: linear-gradient(90deg, #edf8fc 0%, #f8fcfd 62%, #fff 100%);
+  box-shadow: inset 3px 0 #83c8e5;
+}
+
+.pharmacy-row.is-selected .pharmacy-number {
+  color: #347d9d;
+}
+
+.pharmacy-row.is-selected .pharmacy-copy h3 {
+  color: #102934;
 }
 
 .pharmacy-row:focus-visible {
