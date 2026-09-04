@@ -188,6 +188,27 @@ button:disabled {
   gap: 9px;
 }
 
+.language-toggle {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 13px;
+  background: #f5fbfd;
+  color: #315f72;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.language-toggle:hover,
+.language-toggle:focus-visible {
+  border-color: #8bc9e3;
+  background: #eaf7fc;
+}
+
 .collection-pill,
 .account-pill {
   display: inline-flex;
@@ -1180,8 +1201,8 @@ button:disabled {
 
 .pharmacy-results-layout {
   display: grid;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
-  gap: 44px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr);
+  gap: 36px;
   align-items: start;
   margin-top: 42px;
 }
@@ -1190,7 +1211,7 @@ button:disabled {
   position: sticky;
   top: 100px;
   overflow: hidden;
-  height: 560px;
+  height: 640px;
   border: 1px solid rgb(18 38 50 / 12%);
   border-radius: 20px;
   background: #edf3f5;
@@ -2536,6 +2557,11 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .pharmacy-results-layout {
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+    gap: 28px;
+  }
+
   .scan-section {
     gap: 64px;
   }
@@ -2620,6 +2646,14 @@ button:disabled {
 
   .header-actions {
     gap: 6px;
+  }
+
+  .language-toggle {
+    min-width: 42px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 7px 9px;
+    font-size: 10px;
   }
 
   .account-pill {

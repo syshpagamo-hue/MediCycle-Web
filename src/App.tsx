@@ -42,8 +42,19 @@ import {
   saveLocalProgress,
   type MediCycleProgress,
 } from './progress'
+import { useI18n } from './i18n'
 
 const PHARMACY_API_TIMEOUT_MS = 40_000
+
+const zhMarineFacts = [
+  { name: '白鯨', label: '生物累積', text: '藥物殘留與內分泌干擾物可能在海洋哺乳類體內累積，影響免疫、繁殖力與族群的長期健康。' },
+  { name: '綠蠵龜', label: '內分泌干擾', text: '環境中的雌激素可能干擾發育訊號與生殖平衡，對脆弱的海洋族群造成影響。' },
+  { name: '小丑魚', label: '生殖健康', text: '炔雌醇等合成荷爾蒙可能干擾魚類的性腺發育、繁殖與行為。' },
+  { name: '珊瑚礁', label: '生態韌性', text: '進入廢水的藥物殘留可能影響珊瑚與其他海洋生物的生長及繁殖能力。' },
+  { name: '污染水域中的魚', label: '跨世代影響', text: '持續暴露可能降低繁殖力與存活率，影響並可能在多個世代中累積。' },
+] as const
+
+const zhMarineCardNames = ['小丑魚', '白鯨', '綠蠵龜', '珊瑚礁', '水母', '魟魚'] as const
 
 type CameraState =
   | 'idle'
@@ -53,6 +64,7 @@ type CameraState =
   | 'unavailable'
 
 function App() {
+  const { t, language } = useI18n()
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
   const cameraStreamRef = useRef<MediaStream | null>(null)
   const cameraAttemptRef = useRef(0)
@@ -535,14 +547,14 @@ function App() {
   ].includes(locatorState)
 
   const pharmacySection = (
-    <section className="pharmacy-section" id="nearest-pharmacy" aria-label="Nearby pharmacies">
+    <section className="pharmacy-section" id="nearest-pharmacy" aria-label={t('pharmacyAria')}>
       <div className="pharmacy-heading-row">
         <SectionHeading
-          eyebrow="ACTION SUPPORT · PLAN A RETURN OPTION"
-          title="Nearby pharmacies."
-          text="These are nearby pharmacies, not verified medication return points. Contact the pharmacy to confirm medication take-back availability before visiting."
+          eyebrow={t('pharmacyEyebrow')}
+          title={t('pharmacyTitle')}
+          text={t('pharmacyIntro')}
         />
-        <div className="privacy-chip"><span aria-hidden="true" /> Uses OpenStreetMap search</div>
+        <div className="privacy-chip"><span aria-hidden="true" /> {t('osmSearch')}</div>
       </div>
       <div className="pharmacy-entry-actions">
         <button
@@ -551,52 +563,52 @@ function App() {
           onClick={locatePharmacies}
           disabled={locatorState === 'locating'}
         >
-          {locatorState === 'locating' ? 'FINDING PHARMACIES…' : 'USE MY CURRENT LOCATION'}
+          {locatorState === 'locating' ? t('finding') : t('useLocation')}
         </button>
         {canViewSamplePharmacies && (
           <button type="button" className="figma-button outline" onClick={() => showFallbackLocation()}>
-            VIEW SAMPLE PHARMACIES
+            {t('viewSamples')}
           </button>
         )}
       </div>
-      <p className="location-note privacy-disclosure">Your coordinates are sent to this site's Cloudflare Function, which queries OpenStreetMap Overpass providers on the server. They are not stored by MediCycle.</p>
+      <p className="location-note privacy-disclosure">{t('privacyCoordinates')}</p>
       {locatorState === 'locating' && (
-        <p className="location-note" role="status">Allow location access when your browser asks. This usually takes a few seconds.</p>
+        <p className="location-note" role="status">{t('allowLocation')}</p>
       )}
       {locatorState === 'ready' && (
-        <p className="location-note" role="status">Live OpenStreetMap results within {searchRadiusKm} km · sorted nearest first · take-back availability is not verified</p>
+        <p className="location-note" role="status">{t('liveResults', { radius: searchRadiusKm ?? 0 })}</p>
       )}
       {locatorState === 'fallback' && (
-        <p className="location-note demo-note" role="status"><b>DEMO SAMPLE DATA</b> Showing sample pharmacies near Xitun District, Taichung.</p>
+        <p className="location-note demo-note" role="status"><b>{t('demoSample')}</b> {t('demoSampleText')}</p>
       )}
       {locatorState === 'location-error' && (
         <div className="location-error" role="alert">
-          <p>We could not access your location. Enable Location Services for your browser, then try again.</p>
-          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+          <p>{t('locationError')}</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>{t('retry')}</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>{t('viewSamplesInstead')}</button></div>
         </div>
       )}
       {locatorState === 'location-timeout' && (
         <div className="location-error" role="alert">
-          <p>Your browser could not determine your location within 8 seconds. Check Location Services and try again.</p>
-          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+          <p>{t('locationTimeout')}</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>{t('retry')}</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>{t('viewSamplesInstead')}</button></div>
         </div>
       )}
       {locatorState === 'timeout' && (
         <div className="location-error" role="alert">
-          <p>The pharmacy search timed out after trying multiple OpenStreetMap providers.</p>
-          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+          <p>{t('searchTimeout')}</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>{t('retry')}</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>{t('viewSamplesInstead')}</button></div>
         </div>
       )}
       {locatorState === 'network-error' && (
         <div className="location-error" role="alert">
-          <p>All OpenStreetMap pharmacy search providers are currently unavailable.</p>
-          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+          <p>{t('networkError')}</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>{t('retry')}</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>{t('viewSamplesInstead')}</button></div>
         </div>
       )}
       {locatorState === 'empty' && (
         <div className="location-error" role="status">
-          <p>No pharmacies were found within 10 km.</p>
-          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button></div>
+          <p>{t('emptyResults')}</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>{t('retry')}</button></div>
         </div>
       )}
       {pharmacies.length > 0 && mapCenter && (
@@ -607,14 +619,14 @@ function App() {
               pharmacies={pharmacies}
               selectedPharmacyId={selectedPharmacyId}
               onSelectPharmacy={setSelectedPharmacyId}
-              centerLabel={locatorState === 'fallback' ? 'Sample search center' : 'Your location'}
+              centerLabel={locatorState === 'fallback' ? t('sampleCenter') : t('yourLocation')}
             />
             <div className="pharmacy-list">
               {pharmacies.map((pharmacy, index) => (
                 <article
                   className={`pharmacy-row${selectedPharmacyId === pharmacy.id ? ' is-selected' : ''}`}
                   key={pharmacy.id}
-                  aria-label={`Show ${pharmacy.name} on the map`}
+                  aria-label={t('showOnMapAria', { name: pharmacy.name })}
                   onClick={() => setSelectedPharmacyId(pharmacy.id)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -628,32 +640,32 @@ function App() {
                   <div className="pharmacy-copy">
                     <h3>{pharmacy.name}</h3>
                     {pharmacy.address && <p>{pharmacy.address}</p>}
-                    {pharmacy.phone && <small>Phone: {pharmacy.phone}</small>}
-                    {pharmacy.openingHours && <small>Hours: {pharmacy.openingHours}</small>}
+                    {pharmacy.phone && <small>{t('phone')}: {pharmacy.phone}</small>}
+                    {pharmacy.openingHours && <small>{t('hours')}: {pharmacy.openingHours}</small>}
                     <small className={`verification-label is-${pharmacy.takeBackStatus}`}>
                       {pharmacy.takeBackStatus === 'osm-listed'
-                        ? 'OSM-listed drug recycling · contact pharmacy to confirm'
-                        : 'Unverified medication take-back — contact pharmacy to confirm'}
+                        ? t('osmTakeBack')
+                        : t('unverifiedTakeBack')}
                     </small>
                   </div>
                   <div className="pharmacy-actions">
                     <strong>{pharmacy.distance < 1 ? `${Math.round(pharmacy.distance * 1000)} m` : `${pharmacy.distance.toFixed(1)} km`}</strong>
                     <div>
-                      <button type="button" className="map-focus-button" onClick={(event) => { event.stopPropagation(); setSelectedPharmacyId(pharmacy.id) }}>SHOW ON MAP</button>
-                      {pharmacy.phone && <a className="phone-link" href={`tel:${pharmacy.phone}`} onClick={(event) => event.stopPropagation()}>CALL</a>}
-                      <a href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.lat},${pharmacy.lon}`} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>DIRECTIONS</a>
+                      <button type="button" className="map-focus-button" onClick={(event) => { event.stopPropagation(); setSelectedPharmacyId(pharmacy.id) }}>{t('showOnMap')}</button>
+                      {pharmacy.phone && <a className="phone-link" href={`tel:${pharmacy.phone}`} onClick={(event) => event.stopPropagation()}>{t('call')}</a>}
+                      <a href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.lat},${pharmacy.lon}`} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{t('directions')}</a>
                     </div>
                   </div>
                 </article>
               ))}
             </div>
           </div>
-          <p className="data-source">Pharmacy locations and details come from OpenStreetMap contributors. OSM pharmacy data does not verify medication take-back participation.</p>
+          <p className="data-source">{t('pharmacySource')}</p>
           {page === 'result' && (
             <div className="return-plan-action">
               <div>
-                <b>{returnPlanConfirmed ? 'Return option planned' : 'Next: make a contact plan'}</b>
-                <p>Choose a pharmacy you can contact to confirm medication take-back availability.</p>
+                <b>{returnPlanConfirmed ? t('returnPlanned') : t('nextContactPlan')}</b>
+                <p>{t('choosePharmacy')}</p>
               </div>
               <button
                 type="button"
@@ -661,7 +673,7 @@ function App() {
                 onClick={confirmReturnPlan}
                 disabled={returnPlanConfirmed}
               >
-                {returnPlanConfirmed ? '✓ PLAN RECORDED' : 'I WILL CONTACT A PHARMACY'}
+                {returnPlanConfirmed ? t('planRecorded') : t('contactPharmacy')}
               </button>
             </div>
           )}
@@ -699,31 +711,31 @@ function App() {
         <div className="page-shell landing-page">
           {sessionEnded && (
             <section className="session-ended" role="status" aria-labelledby="session-ended-title">
-              <div><p className="eyebrow">DEMO SESSION</p><h2 id="session-ended-title">Demo session ended</h2><p>For privacy and clarity, a result is not restored after refresh.</p></div>
-              <button type="button" className="figma-button black" onClick={startNewScan}>START NEW SCAN</button>
+              <div><p className="eyebrow">{t('session')}</p><h2 id="session-ended-title">{t('sessionEnded')}</h2><p>{t('sessionPrivacy')}</p></div>
+              <button type="button" className="figma-button black" onClick={startNewScan}>{t('newScan')}</button>
             </section>
           )}
           <HeroArtwork onScan={() => goToSection('scan')} />
 
           <section className="value-strip" aria-label="Product value">
-            <div><span>1</span><p><b>Fixed demo case</b><small>Ethinyl estradiol disposal journey</small></p></div>
-            <div><span>LOCAL</span><p><b>Private preview</b><small>Selected photos stay on this device</small></p></div>
-            <div><span>4</span><p><b>Guided steps</b><small>Guidance, planning, simulation, reward</small></p></div>
-            <div><span>6</span><p><b>Marine stories</b><small>Ocean impact collection</small></p></div>
+            <div><span>1</span><p><b>{t('fixedCase')}</b><small>{t('fixedCaseText')}</small></p></div>
+            <div><span>LOCAL</span><p><b>{t('privatePreview')}</b><small>{t('privatePreviewText')}</small></p></div>
+            <div><span>4</span><p><b>{t('guidedSteps')}</b><small>{t('guidedStepsText')}</small></p></div>
+            <div><span>6</span><p><b>{t('marineStories')}</b><small>{t('marineStoriesText')}</small></p></div>
           </section>
 
           <section className="scan-section" id="scan" aria-labelledby="scan-title">
             <div className="scan-intro">
               <SectionHeading
                 id="scan-title"
-                eyebrow="START HERE"
-                title="Preview a photo. Explore one fixed case."
-                text="Take or upload a photo to try the mobile-first preview. This prototype does not identify the photo; the next screen always uses the clearly labeled Ethinyl Estradiol demonstration case."
+                eyebrow={t('scanEyebrow')}
+                title={t('scanTitle')}
+                text={t('scanText')}
               />
               <ProcessSteps active={0} />
               <div className="prototype-note">
-                <b>Demo Mode · No live AI recognition</b>
-                <p>Your photo is only previewed locally and never changes the fixed demonstration result. A validated model can be connected in a future version.</p>
+                <b>{t('demoNoAi')}</b>
+                <p>{t('demoNoAiText')}</p>
               </div>
             </div>
 
@@ -735,10 +747,10 @@ function App() {
               <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif" hidden onChange={selectFile('upload')} />
               <div className="photo-entry-actions" aria-label="Choose how to add a photo">
                 <button type="button" className="figma-button black" onClick={openCamera} disabled={cameraState === 'opening'}>
-                  {captureSource === 'camera' && file ? 'RETAKE PHOTO' : 'TAKE A PHOTO'}
+                  {captureSource === 'camera' && file ? t('retakePhoto') : t('takePhoto')}
                 </button>
                 <button type="button" className="figma-button outline" onClick={() => { stopCamera(); uploadRef.current?.click() }}>
-                  {captureSource === 'upload' && file ? 'REPLACE PHOTO' : 'UPLOAD FROM DEVICE'}
+                  {captureSource === 'upload' && file ? t('replacePhoto') : t('uploadDevice')}
                 </button>
               </div>
               {cameraState === 'opening' && <p className="camera-status" role="status"><span className="spinner dark" aria-hidden="true" /> Opening camera…</p>}
@@ -747,7 +759,7 @@ function App() {
               {cameraState === 'ready' && (
                 <div className="camera-stage" role="region" aria-label="Camera preview">
                   <video ref={cameraVideoRef} autoPlay muted playsInline />
-                  <div><button type="button" className="figma-button black" onClick={captureCameraPhoto}>CAPTURE PHOTO</button><button type="button" className="text-button" onClick={() => stopCamera()}>CANCEL CAMERA</button></div>
+                  <div><button type="button" className="figma-button black" onClick={captureCameraPhoto}>{t('capturePhoto')}</button><button type="button" className="text-button" onClick={() => stopCamera()}>{t('cancelCamera')}</button></div>
                 </div>
               )}
               {cameraState === 'idle' && <p className="camera-fallback-note">Camera unavailable or permission declined? Use <b>Upload from device</b> instead.</p>}
@@ -760,19 +772,19 @@ function App() {
                 {preview ? <DetectionPreview src={preview} alt="Selected medicine preview" detections={[]} /> : (
                   <div className="upload-empty">
                     <span aria-hidden="true">+</span>
-                    <p>Photo preview</p>
+                    <p>{t('photoPreview')}</p>
                     <small>Use Take a photo or Upload from device above. Desktop users can also drop an image here.</small>
                   </div>
                 )}
               </div>
               {file && (
                 <div className="file-summary" aria-live="polite">
-                  <div><span aria-hidden="true">✓</span><p><b>Preview ready · not analyzed</b><small>{file.name}</small></p></div>
-                  <button type="button" className="text-button" onClick={removeFile}>CANCEL</button>
+                  <div><span aria-hidden="true">✓</span><p><b>{t('previewReady')}</b><small>{file.name}</small></p></div>
+                  <button type="button" className="text-button" onClick={removeFile}>{t('cancel')}</button>
                 </div>
               )}
               <button type="button" className="figma-button black analyze-button" onClick={openFixedDemoCase} disabled={isAnalyzing}>
-                {isAnalyzing ? <><span className="spinner" aria-hidden="true" /> OPENING DEMO CASE…</> : 'CONTINUE WITH FIXED DEMO CASE →'}
+                {isAnalyzing ? <><span className="spinner" aria-hidden="true" /> {t('openingDemo')}</> : t('continueDemo')}
               </button>
               <p className="privacy-note">Demo Mode: photos are previewed locally, are not uploaded or stored, and do not affect the fixed result.</p>
             </div>
@@ -780,9 +792,9 @@ function App() {
 
           <section className="impact-section" id="impact">
             <div className="impact-statement">
-              <p className="eyebrow">WHY IT MATTERS</p>
-              <h2>Knowledge is not the finish line.<br />Behavior change is.</h2>
-              <p>MediCycle AI combines artificial intelligence with behavioral science. Recognition lowers the cognitive barrier, instant rewards sustain participation, and marine stories awaken awareness of environmental consequences.</p>
+              <p className="eyebrow">{t('whyEyebrow')}</p>
+              <h2>{t('whyTitle').split('\n').map((line, index) => <span key={line}>{index > 0 && <br />}{line}</span>)}</h2>
+              <p>{t('whyText')}</p>
               <div className="sdg-row" aria-label="United Nations Sustainable Development Goals addressed">
                 <span>SDG 3 · GOOD HEALTH</span><span>SDG 6 · CLEAN WATER</span><span>SDG 14 · LIFE BELOW WATER</span>
               </div>
@@ -799,21 +811,24 @@ function App() {
           </section>
 
           <section className="learn-section" aria-labelledby="learn-title">
-            <SectionHeading id="learn-title" eyebrow="THE OCEAN CONNECTION" title="Small residues. System-wide effects." text="Explore how pharmaceutical pollution can affect marine life across species, habitats, and generations." />
+            <SectionHeading id="learn-title" eyebrow={t('oceanConnection')} title={t('oceanTitle')} text={t('oceanText')} />
             <div className="marine-grid">
-              {marineFacts.map((fact) => (
+              {marineFacts.map((fact, index) => {
+                const copy = language === 'zh-TW' ? zhMarineFacts[index] : fact
+                return (
                 <article key={fact.name}>
                   <div className="marine-image-wrap"><img src={fact.image} alt="" width={420} height={420} /></div>
-                  <p className="fact-label">{fact.label}</p><h3>{fact.name}</h3><p>{fact.text}</p>
+                  <p className="fact-label">{copy.label}</p><h3>{copy.name}</h3><p>{copy.text}</p>
                 </article>
-              ))}
+                )
+              })}
             </div>
           </section>
 
           <section className="activity-section">
             <div className="activity-heading">
-              <SectionHeading eyebrow="POSITIVE REINFORCEMENT" title="Turn responsible disposal into an ocean collection." />
-              <p><b>{recycledCount} of {marineCards.length}</b> cards unlocked on this device</p>
+              <SectionHeading eyebrow={t('reinforcement')} title={t('collectionTitle')} />
+              <p><b>{t('cardsUnlockedDevice', { count: recycledCount })}</b></p>
             </div>
             <ActivityBanner onOpen={() => navigate('activity')} />
           </section>
@@ -823,39 +838,39 @@ function App() {
 
       {page === 'result' && result && (
         <div className="page-shell result-page">
-          <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>← BACK TO PREVIEW</button><span>DEMO MODE · FIXED CASE · NOT LIVE AI</span></div>
+          <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>{t('backPreview')}</button><span>{t('resultMode')}</span></div>
           <ProcessSteps active={recycledForResult ? 4 : returnPlanConfirmed ? 2 : 1} />
           <section className="result-hero" aria-live="polite">
             <div className="result-image">
               {preview ? <DetectionPreview src={preview} alt="User-selected preview, not analyzed" detections={[]} /> : (
-                <div className="demo-case-card"><span>FIXED DEMONSTRATION CASE</span><b>Ethinyl Estradiol<br />0.03 mg</b><small>No photo identification is performed in Demo Mode.</small></div>
+                <div className="demo-case-card"><span>{t('fixedDemonstration')}</span><b>Ethinyl Estradiol<br />0.03 mg</b><small>{t('noPhotoId')}</small></div>
               )}
               {preview && <div className="preview-disclaimer">PREVIEW ONLY · THIS PHOTO WAS NOT ANALYZED</div>}
             </div>
             <div className="result-summary">
-              <p className="eyebrow">FIXED CASE · NOT AN IMAGE RECOGNITION RESULT</p>
-              <h1>{result.drugName}</h1><p className="category-line">{result.category}</p>
-              <div className={`action-badge ${result.action}`}><span aria-hidden="true">{result.action === 'return' ? '↗' : '✓'}</span>{result.action === 'return' ? 'RETURN TO A PROFESSIONAL COLLECTION POINT' : 'FOLLOW LOCAL HOUSEHOLD DISPOSAL GUIDANCE'}</div>
-              <div className="demo-result-notice"><b>Demo Mode</b><span>This guidance belongs to the fixed Ethinyl Estradiol case, not to your selected photo.</span></div>
-              <p className="medical-disclaimer">Prototype guidance is not medical advice. Confirm the medicine and local disposal requirements with a qualified professional.</p>
+              <p className="eyebrow">{t('resultEyebrow')}</p>
+              <h1>{result.drugName}</h1><p className="category-line">{language === 'zh-TW' ? t('resultCategory') : result.category}</p>
+              <div className={`action-badge ${result.action}`}><span aria-hidden="true">{result.action === 'return' ? '↗' : '✓'}</span>{t('returnProfessional')}</div>
+              <div className="demo-result-notice"><b>Demo Mode</b><span>{t('resultNotice')}</span></div>
+              <p className="medical-disclaimer">{t('medicalDisclaimer')}</p>
             </div>
           </section>
 
           <section className="disposal-plan">
-            <SectionHeading eyebrow="YOUR DISPOSAL PLAN" title="A safe hand-off, step by step." text={result.reason} />
-            <ol>{result.steps.map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, '0')}</span><p>{step}</p></li>)}</ol>
+            <SectionHeading eyebrow={t('disposalEyebrow')} title={t('disposalTitle')} text={language === 'zh-TW' ? t('disposalReason') : result.reason} />
+            <ol>{(language === 'zh-TW' ? [t('disposalStep1'), t('disposalStep2'), t('disposalStep3')] : result.steps).map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, '0')}</span><p>{step}</p></li>)}</ol>
           </section>
           {pharmacySection}
 
           <div className="result-action-panel">
-            <div><p className="eyebrow">STEP 03 · DEMO COMPLETION</p><h2>{recycledForResult ? 'Demo completion recorded. Marine life unlocked.' : returnPlanConfirmed ? 'Return plan ready. Simulate the hand-off to unlock a card.' : 'Find and plan a return option before simulating completion.'}</h2></div>
+            <div><p className="eyebrow">{t('completionEyebrow')}</p><h2>{recycledForResult ? t('completionDone') : returnPlanConfirmed ? t('completionReady') : t('completionFind')}</h2></div>
             <button
               type="button"
               className={`figma-button blue${recycledForResult ? ' completed' : ''}`}
               onClick={() => returnPlanConfirmed ? markAsRecycled() : document.getElementById('nearest-pharmacy')?.scrollIntoView({ behavior: 'smooth' })}
               aria-disabled={recycledForResult}
             >
-              {recycledForResult ? '✓ MARINE LIFE UNLOCKED' : returnPlanConfirmed ? 'SIMULATE COMPLETION & UNLOCK' : 'FIND / PLAN A RETURN OPTION'}
+              {recycledForResult ? t('marineUnlocked') : returnPlanConfirmed ? t('simulateUnlock') : t('findPlan')}
             </button>
           </div>
 
@@ -871,15 +886,15 @@ function App() {
 
       {page === 'activity' && (
         <div className="page-shell activity-page">
-          <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>← BACK HOME</button><span>MY OCEAN</span></div>
+          <div className="result-topbar"><button className="back-link" type="button" onClick={() => navigate('home')}>{t('backHome')}</button><span>{t('myOcean')}</span></div>
           <ActivityBanner />
           <section className="activity-copy">
-            <p className="eyebrow">BEHAVIOR → IMPACT → STORY</p><h1>Build an ocean worth protecting.</h1>
-            <p>{recycledCount === marineCards.length ? 'Six responsible disposal actions have revealed the complete marine collection. Every card makes an invisible environmental choice visible—and turns repeated action into a lasting habit.' : 'Each responsible disposal action reveals a marine life card. Return to the scanner to keep building your collection and connect everyday choices with ocean health.'}</p>
+            <p className="eyebrow">{t('oceanStory')}</p><h1>{t('oceanBuild')}</h1>
+            <p>{recycledCount === marineCards.length ? t('activityCompleteText') : t('activityText')}</p>
             <div className={`collection-progress${recycledCount === marineCards.length ? ' is-complete' : ''}`}>
               <i><span style={{ width: `${(recycledCount / marineCards.length) * 100}%` }} /></i>
-              <p><b>{recycledCount}</b> of {marineCards.length} cards unlocked{recycledCount === marineCards.length ? ' · Collection complete' : ''}</p>
-              <button type="button" className="text-button reset-demo-button" onClick={resetDemoProgress}>RESET DEMO PROGRESS</button>
+              <p>{t('cardsProgress', { count: recycledCount })}{recycledCount === marineCards.length ? ` · ${t('collectionComplete')}` : ''}</p>
+              <button type="button" className="text-button reset-demo-button" onClick={resetDemoProgress}>{t('resetProgress')}</button>
             </div>
           </section>
           <section className="collection-grid" aria-label="Marine life card collection">
@@ -889,32 +904,32 @@ function App() {
                 <article key={card.name} className={unlocked ? 'is-unlocked' : 'is-locked'}>
                   <div>{unlocked ? <img src={card.image} alt={`${card.name} marine life card`} /> : <span aria-hidden="true">?</span>}</div>
                   <p>{String(index + 1).padStart(2, '0')} / {String(marineCards.length).padStart(2, '0')}</p>
-                  <h2>{unlocked ? card.name : 'Secret species'}</h2>
-                  <small>{unlocked ? 'UNLOCKED' : 'COMPLETE A SAFE DISPOSAL TO REVEAL'}</small>
+                  <h2>{unlocked ? (language === 'zh-TW' ? zhMarineCardNames[index] : card.name) : t('secretSpecies')}</h2>
+                  <small>{unlocked ? t('unlocked') : t('lockedHint')}</small>
                 </article>
               )
             })}
           </section>
           <div className="collection-cta">
-            <div><p className="eyebrow">{recycledCount === marineCards.length ? 'OCEAN COLLECTION COMPLETE' : 'KEEP THE OCEAN GROWING'}</p><h2>{recycledCount === marineCards.length ? 'Six safer choices. One ocean worth protecting.' : 'Your next safe return reveals another species.'}</h2></div>
-            <button type="button" className="figma-button black" onClick={() => { navigate('home'); window.setTimeout(() => document.getElementById('scan')?.scrollIntoView({ behavior: 'smooth' }), 80) }}>CONTINUE THE IMPACT</button>
+            <div><p className="eyebrow">{recycledCount === marineCards.length ? t('collectionCompleteEyebrow') : t('collectionContinueEyebrow')}</p><h2>{recycledCount === marineCards.length ? t('collectionCompleteTitle') : t('collectionContinueTitle')}</h2></div>
+            <button type="button" className="figma-button black" onClick={() => { navigate('home'); window.setTimeout(() => document.getElementById('scan')?.scrollIntoView({ behavior: 'smooth' }), 80) }}>{t('continueImpact')}</button>
           </div>
         </div>
       )}
 
       <footer className="site-footer">
-        <div><b>MEDICYCLE AI</b><p>Smart hormone medication recycling through AI, behavioral science, and ocean empathy.</p></div>
+        <div><b>MEDICYCLE AI</b><p>{t('footer')}</p></div>
         <div><span>STATIC COMPETITION PROTOTYPE · 2026</span><span>BUILT FOR RESPONSIBLE ACTION</span></div>
       </footer>
 
       {unlockedCard && (
         <div className="card-dialog-backdrop" role="presentation" onMouseDown={closeUnlockedCard}>
           <section className="card-dialog" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="card-title" aria-describedby="card-description" onMouseDown={(event) => event.stopPropagation()}>
-            <button ref={dialogCloseRef} className="dialog-close" type="button" onClick={closeUnlockedCard} aria-label="Close card">×</button>
-            <p>SECRET MARINE LIFE CARD</p><h2 id="card-title">You unlocked {unlockedCard.name}!</h2>
+            <button ref={dialogCloseRef} className="dialog-close" type="button" onClick={closeUnlockedCard} aria-label={t('closeCard')}>×</button>
+            <p>{t('secretCard')}</p><h2 id="card-title">{t('youUnlocked', { name: unlockedCard.name })}</h2>
             <img src={unlockedCard.image} alt={`${unlockedCard.name} marine life card`} width={440} height={590} />
             <p id="card-description" className="sr-only">A marine life card was unlocked after the demo completion.</p>
-            <button type="button" className="figma-button black" onClick={() => { closeUnlockedCard(); window.setTimeout(() => document.getElementById('impact-check')?.scrollIntoView({ behavior: 'smooth' }), 80) }}>CONTINUE TO IMPACT CHECK</button>
+            <button type="button" className="figma-button black" onClick={() => { closeUnlockedCard(); window.setTimeout(() => document.getElementById('impact-check')?.scrollIntoView({ behavior: 'smooth' }), 80) }}>{t('continueQuiz')}</button>
           </section>
         </div>
       )}

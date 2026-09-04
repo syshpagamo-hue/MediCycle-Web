@@ -1,5 +1,6 @@
 import type { PageName } from './data'
 import { marineCards } from './data'
+import { useI18n } from './i18n'
 
 export function SiteHeader({
   page,
@@ -16,6 +17,7 @@ export function SiteHeader({
   onSection: (id: string) => void
   onAccount: () => void
 }) {
+  const { t, toggleLanguage } = useI18n()
   return (
     <header className="site-header">
       <div className="header-inner">
@@ -23,33 +25,34 @@ export function SiteHeader({
           className="wordmark"
           type="button"
           onClick={() => onNavigate('home')}
-          aria-label="MediCycle AI home"
+          aria-label={t('headerHome')}
         >
           <span className="wordmark-symbol" aria-hidden="true"><i /><i /></span>
           <span>MEDICYCLE AI</span>
         </button>
         <nav aria-label="Primary navigation">
-          <button type="button" onClick={() => onSection('scan')}>Scan medicine</button>
-          <button type="button" onClick={() => onSection('impact')}>Why it matters</button>
-          <button type="button" onClick={() => onSection('nearest-pharmacy')}>Find a pharmacy</button>
+          <button type="button" onClick={() => onSection('scan')}>{t('navScan')}</button>
+          <button type="button" onClick={() => onSection('impact')}>{t('navWhy')}</button>
+          <button type="button" onClick={() => onSection('nearest-pharmacy')}>{t('navPharmacy')}</button>
         </nav>
         <div className="header-actions">
           <button
             type="button"
             className={`account-pill${accountStatus === 'signed-in' ? ' is-signed-in' : ''}`}
             onClick={onAccount}
-            aria-label={accountStatus === 'signed-in' ? 'Open MediCycle account, signed in' : 'Open MediCycle prototype account'}
+            aria-label={accountStatus === 'signed-in' ? t('headerAccountSigned') : t('headerAccountGuest')}
           >
             <i aria-hidden="true" />
-            <span>{accountStatus === 'signed-in' ? 'Synced' : 'Account'}</span>
+            <span>{accountStatus === 'signed-in' ? t('synced') : t('account')}</span>
           </button>
+          <button type="button" className="language-toggle" onClick={toggleLanguage} aria-label={t('languageAria')}><span aria-hidden="true">◎</span>{t('language')}</button>
           <button
             type="button"
             className={`collection-pill${page === 'activity' ? ' is-active' : ''}`}
             onClick={() => onNavigate('activity')}
             aria-label={`Open ocean collection, ${recycledCount} of ${marineCards.length} cards unlocked`}
           >
-            <span>My Ocean</span>
+            <span>{t('myOcean')}</span>
             <b>{recycledCount}/{marineCards.length}</b>
           </button>
         </div>
@@ -59,6 +62,7 @@ export function SiteHeader({
 }
 
 export function HeroArtwork({ onScan }: { onScan: () => void }) {
+  const { t } = useI18n()
   return (
     <section className="hero" aria-labelledby="hero-title">
       <img
@@ -69,17 +73,18 @@ export function HeroArtwork({ onScan }: { onScan: () => void }) {
         height={1080}
       />
       <div className="hero-caption">
-        <p className="eyebrow">AI × BEHAVIORAL SCIENCE × OCEAN CONSERVATION</p>
-        <h1 id="hero-title">Recognize the medicine.<br />Activate better choices.</h1>
-        <p>Turn one photo into disposal confidence, a safer next step, and an engaging journey toward ocean responsibility.</p>
-        <button className="figma-button black" type="button" onClick={onScan}>SCAN A MEDICINE</button>
+        <p className="eyebrow">{t('heroEyebrow')}</p>
+        <h1 id="hero-title">{t('heroTitle').split('\n').map((line, index) => <span key={line}>{index > 0 && <br />}{line}</span>)}</h1>
+        <p>{t('heroText')}</p>
+        <button className="figma-button black" type="button" onClick={onScan}>{t('heroCta')}</button>
       </div>
-      <div className="hero-status"><span aria-hidden="true" /> Demo mode · Fixed case</div>
+      <div className="hero-status"><span aria-hidden="true" /> {t('demoFixed')}</div>
     </section>
   )
 }
 
 export function ActivityBanner({ onOpen }: { onOpen?: () => void }) {
+  const { t } = useI18n()
   return (
     <div className="activity-banner">
       <img
@@ -90,7 +95,7 @@ export function ActivityBanner({ onOpen }: { onOpen?: () => void }) {
       />
       {onOpen && (
         <button type="button" className="banner-button" onClick={onOpen}>
-          EXPLORE THE COLLECTION
+          {t('exploreCollection')}
         </button>
       )}
     </div>
@@ -98,15 +103,16 @@ export function ActivityBanner({ onOpen }: { onOpen?: () => void }) {
 }
 
 export function ProcessSteps({ active = 0 }: { active?: 0 | 1 | 2 | 3 | 4 }) {
+  const { t } = useI18n()
   const steps = [
-    ['01', 'View guidance', 'Open the fixed demonstration case'],
-    ['02', 'Plan a return', 'Find and contact a nearby pharmacy'],
-    ['03', 'Demo completion', 'Simulate the real-world hand-off'],
-    ['04', 'Unlock', 'Reveal a marine life card'],
+    ['01', t('step1'), t('step1Text')],
+    ['02', t('step2'), t('step2Text')],
+    ['03', t('step3'), t('step3Text')],
+    ['04', t('step4'), t('step4Text')],
   ]
 
   return (
-    <ol className="process-steps" aria-label="Four-step disposal journey">
+    <ol className="process-steps" aria-label={t('stepsAria')}>
       {steps.map(([number, title, description], index) => (
         <li key={number} className={index + 1 <= active ? 'is-active' : ''}>
           <span>{number}</span>

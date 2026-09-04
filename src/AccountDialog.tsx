@@ -5,6 +5,7 @@ import {
   resetAccountProgress,
 } from './account'
 import type { MediCycleProgress } from './progress'
+import { useI18n } from './i18n'
 
 type AccountDialogProps = {
   open: boolean
@@ -25,6 +26,7 @@ export function AccountDialog({
   onLoggedOut,
   onProgressReset,
 }: AccountDialogProps) {
+  const { t } = useI18n()
   const [mode, setMode] = useState<'register' | 'login'>('register')
   const [phone, setPhone] = useState('')
   const [pin, setPin] = useState('')
@@ -64,7 +66,7 @@ export function AccountDialog({
     event.preventDefault()
     setError('')
     if (!/^\d{6}$/.test(pin)) {
-      setError('PIN must contain exactly 6 digits.')
+      setError(t('pinError'))
       return
     }
     setIsWorking(true)
@@ -96,7 +98,7 @@ export function AccountDialog({
   }
 
   const reset = async () => {
-    if (!window.confirm('Reset your synced MediCycle progress? Your account will remain available.')) return
+    if (!window.confirm(t('resetConfirm'))) return
     setError('')
     setIsWorking(true)
     try {
@@ -118,30 +120,30 @@ export function AccountDialog({
         aria-labelledby="account-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button ref={closeRef} className="dialog-close" type="button" onClick={onClose} aria-label="Close account">×</button>
-        <p className="eyebrow">PROTOTYPE ACCOUNT</p>
-        <h2 id="account-title">Keep your ocean progress.</h2>
-        <p className="account-intro">This is a prototype phone-and-PIN account. It does not send an SMS and does not verify ownership of the phone number.</p>
+        <button ref={closeRef} className="dialog-close" type="button" onClick={onClose} aria-label={t('closeAccount')}>×</button>
+        <p className="eyebrow">{t('prototypeAccount')}</p>
+        <h2 id="account-title">{t('accountTitle')}</h2>
+        <p className="account-intro">{t('accountIntro')}</p>
 
         {signedIn ? (
           <div className="account-signed-in">
-            <p className="account-status"><span aria-hidden="true" /> Signed in · progress sync is on</p>
-            <div className="account-progress-grid" aria-label="Saved progress">
-              <div><b>{progress.marineCollection.length}/6</b><span>Marine cards</span></div>
-              <div><b>{progress.quiz.completed ? `${progress.quiz.bestScore}/6` : '—'}</b><span>Best quiz</span></div>
-              <div><b>{progress.recycledDemoCount}</b><span>Demo completions</span></div>
+            <p className="account-status"><span aria-hidden="true" /> {t('signedInStatus')}</p>
+            <div className="account-progress-grid" aria-label={t('savedProgress')}>
+              <div><b>{progress.marineCollection.length}/6</b><span>{t('marineCards')}</span></div>
+              <div><b>{progress.quiz.completed ? `${progress.quiz.bestScore}/6` : '—'}</b><span>{t('bestQuiz')}</span></div>
+              <div><b>{progress.recycledDemoCount}</b><span>{t('demoCompletions')}</span></div>
             </div>
-            <button className="figma-button black" type="button" onClick={logout} disabled={isWorking}>LOG OUT</button>
-            <button className="text-button account-reset" type="button" onClick={reset} disabled={isWorking}>RESET MY PROGRESS</button>
+            <button className="figma-button black" type="button" onClick={logout} disabled={isWorking}>{t('logOut')}</button>
+            <button className="text-button account-reset" type="button" onClick={reset} disabled={isWorking}>{t('resetMyProgress')}</button>
           </div>
         ) : (
           <>
             <div className="account-mode-tabs" role="tablist" aria-label="Account action">
-              <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => { setMode('register'); setError('') }}>FIRST TIME</button>
-              <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => { setMode('login'); setError('') }}>SIGN IN</button>
+              <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => { setMode('register'); setError('') }}>{t('firstTime')}</button>
+              <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => { setMode('login'); setError('') }}>{t('signIn')}</button>
             </div>
             <form className="account-form" onSubmit={submit}>
-              <label htmlFor="account-phone">Phone number</label>
+              <label htmlFor="account-phone">{t('phoneNumber')}</label>
               <input
                 id="account-phone"
                 type="tel"
@@ -149,10 +151,10 @@ export function AccountDialog({
                 autoComplete="tel"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
-                placeholder="Include country code"
+                placeholder={t('countryCode')}
                 required
               />
-              <label htmlFor="account-pin">{mode === 'register' ? 'Create a 6-digit PIN' : '6-digit PIN'}</label>
+              <label htmlFor="account-pin">{mode === 'register' ? t('createPin') : t('pin')}</label>
               <input
                 id="account-pin"
                 type="password"
@@ -166,14 +168,14 @@ export function AccountDialog({
                 required
               />
               <button className="figma-button black" type="submit" disabled={isWorking}>
-                {isWorking ? 'PLEASE WAIT…' : mode === 'register' ? 'CREATE PROTOTYPE ACCOUNT' : 'SIGN IN & RESTORE'}
+                {isWorking ? t('pleaseWait') : mode === 'register' ? t('createAccount') : t('signInRestore')}
               </button>
             </form>
           </>
         )}
 
         <p className="account-error" aria-live="polite">{error}</p>
-        <p className="account-privacy">Your phone number is used only to identify and restore your MediCycle progress. It is not used for marketing.</p>
+        <p className="account-privacy">{t('accountPrivacy')}</p>
       </section>
     </div>
   )

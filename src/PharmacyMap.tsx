@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { divIcon, type Map as LeafletMap } from 'leaflet'
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import type { Coordinates, Pharmacy } from './data'
+import { useI18n } from './i18n'
 
 type PharmacyMapProps = {
   center: Coordinates
@@ -73,13 +74,14 @@ export function PharmacyMap({
   onSelectPharmacy,
   centerLabel,
 }: PharmacyMapProps) {
+  const { t } = useI18n()
   const selected = pharmacies.find((pharmacy) => pharmacy.id === selectedPharmacyId)
 
   return (
-    <div className="pharmacy-map" aria-label="Interactive map of nearby pharmacies">
+    <div className="pharmacy-map" aria-label={t('interactiveMap')}>
       <div className="pharmacy-map-status" aria-hidden="true">
-        <span><i /> Nearby network</span>
-        <b>{String(pharmacies.length).padStart(2, '0')} locations</b>
+        <span><i /> {t('nearbyNetwork')}</span>
+        <b>{t('locations', { count: String(pharmacies.length).padStart(2, '0') })}</b>
       </div>
       <MapContainer
         center={[center.lat, center.lon]}
@@ -108,8 +110,8 @@ export function PharmacyMap({
             <Popup>
               <strong>{pharmacy.name}</strong><br />
               {pharmacy.distance < 1
-                ? `${Math.round(pharmacy.distance * 1000)} m away`
-                : `${pharmacy.distance.toFixed(1)} km away`}
+                ? t('awayMeters', { distance: Math.round(pharmacy.distance * 1000) })
+                : t('awayKm', { distance: pharmacy.distance.toFixed(1) })}
               {pharmacy.address && <><br /><span>{pharmacy.address}</span></>}
             </Popup>
           </Marker>
