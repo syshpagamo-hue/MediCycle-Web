@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Detection } from './inference/yolo'
 import { layoutDetectionLabels, type LayoutRect } from './detectionLabelLayout'
-
-const colors = ['#5eb7dd', '#ff8a3d', '#ffce54', '#745bd8', '#20a67a', '#e6537c']
+import { getMedicineColor, getMedicineDisplayName, getMedicineTextColor } from './medicineMeta'
 
 export function DetectionPreview({
   src,
@@ -63,7 +62,7 @@ export function DetectionPreview({
         id: index,
         priority: detection.confidence,
         anchor: rect,
-        width: context.measureText(`${detection.label} ${(detection.confidence * 100).toFixed(1)}%`).width + horizontalPadding * 2,
+        width: context.measureText(`${getMedicineDisplayName(detection.label, detection.classId)} ${(detection.confidence * 100).toFixed(1)}%`).width + horizontalPadding * 2,
         height: labelHeight,
       })),
       { x: offsetX, y: offsetY, width: renderedWidth, height: renderedHeight },
@@ -72,7 +71,7 @@ export function DetectionPreview({
     setDenseMode((current) => current === shouldUseDenseMode ? current : shouldUseDenseMode)
 
     boxes.forEach(({ detection, rect }) => {
-      const color = colors[detection.classId % colors.length]
+      const color = getMedicineColor(detection.label, detection.classId)
       context.strokeStyle = color
       context.lineWidth = Math.max(2, width / 320)
       context.strokeRect(rect.x, rect.y, rect.width, rect.height)
@@ -81,8 +80,8 @@ export function DetectionPreview({
     if (layout) {
       layout.forEach(({ id, rect, connector }) => {
         const detection = detections[id]
-        const color = colors[detection.classId % colors.length]
-        const label = `${detection.label} ${(detection.confidence * 100).toFixed(1)}%`
+        const color = getMedicineColor(detection.label, detection.classId)
+        const label = `${getMedicineDisplayName(detection.label, detection.classId)} ${(detection.confidence * 100).toFixed(1)}%`
 
         context.beginPath()
         context.moveTo(connector.fromX, connector.fromY)
@@ -92,13 +91,13 @@ export function DetectionPreview({
         context.stroke()
         context.fillStyle = color
         context.fillRect(rect.x, rect.y, rect.width, rect.height)
-        context.fillStyle = '#050505'
+        context.fillStyle = getMedicineTextColor(detection.label, detection.classId)
         context.textBaseline = 'middle'
         context.fillText(label, rect.x + horizontalPadding, rect.y + rect.height / 2)
       })
     } else {
       boxes.forEach(({ detection, index, rect }) => {
-        const color = colors[detection.classId % colors.length]
+        const color = getMedicineColor(detection.label, detection.classId)
         const badgeSize = Math.max(18, Math.min(24, width / 20))
         const badge: LayoutRect = {
           x: Math.min(Math.max(rect.x, offsetX), offsetX + renderedWidth - badgeSize),
@@ -108,7 +107,7 @@ export function DetectionPreview({
         }
         context.fillStyle = color
         context.fillRect(badge.x, badge.y, badge.width, badge.height)
-        context.fillStyle = '#050505'
+        context.fillStyle = getMedicineTextColor(detection.label, detection.classId)
         context.font = `700 ${Math.max(11, badgeSize * 0.55)}px Arial, sans-serif`
         context.textAlign = 'center'
         context.textBaseline = 'middle'
@@ -137,8 +136,8 @@ export function DetectionPreview({
         <ol className="detection-legend" aria-label="Detection labels">
           {detections.map((detection, index) => (
             <li key={`${detection.classId}-${index}`}>
-              <span style={{ backgroundColor: colors[detection.classId % colors.length] }}>{index + 1}</span>
-              <b>{detection.label}</b>
+              <span style={{ backgroundColor: getMedicineColor(detection.label, detection.classId), color: getMedicineTextColor(detection.label, detection.classId) }}>{index + 1}</span>
+              <b>{getMedicineDisplayName(detection.label, detection.classId)}</b>
               <small>{(detection.confidence * 100).toFixed(1)}%</small>
             </li>
           ))}

@@ -5,6 +5,10 @@
   --button-light-gray: #dddddd;
   --figma-blue: #9dd4ec;
   --blue-light: #eef8fc;
+  --hormone-accent: #6d28d9;
+  --hormone-tint: #f5f1ff;
+  --endocrine-accent: #0f766e;
+  --endocrine-tint: #eef9f7;
   --surface: #f4f5f6;
   --hero-gray: #d9dee2;
   --line: #dddddd;
@@ -1796,10 +1800,175 @@ button:disabled {
   min-width: 0;
 }
 
+.result-summary.is-hormone-therapy,
+.result-summary.is-endocrine-related {
+  border-left: 4px solid var(--hormone-accent);
+  padding-left: clamp(20px, 2.5vw, 36px);
+}
+
+.result-summary.is-endocrine-related {
+  border-left-width: 3px;
+  border-left-color: var(--endocrine-accent);
+}
+
+.result-summary.is-hormone-therapy h1 {
+  color: var(--hormone-accent);
+}
+
+.result-summary.is-endocrine-related h1 {
+  color: var(--endocrine-accent);
+}
+
 .category-line {
   margin: 0;
   color: #777;
   font-size: 14px;
+}
+
+.medicine-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 13px 0 0;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: var(--hormone-tint);
+  color: var(--hormone-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.medicine-category > span,
+.medicine-highlight-legend i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.medicine-category.is-endocrine-related {
+  background: var(--endocrine-tint);
+  color: var(--endocrine-accent);
+}
+
+.medicine-highlight-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 11px 0;
+  color: #555;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.medicine-highlight-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.medicine-highlight-legend .is-hormone-therapy {
+  color: var(--hormone-accent);
+}
+
+.medicine-highlight-legend .is-endocrine-related {
+  color: var(--endocrine-accent);
+}
+
+.candidate-list {
+  margin-top: 25px;
+}
+
+.candidate-list-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.candidate-list-heading b {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.candidate-list-heading small {
+  max-width: 330px;
+  color: #777;
+  font-size: 9px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.candidate-list ol {
+  display: grid;
+  max-height: 224px;
+  gap: 6px;
+  overflow-y: auto;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate-list li {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  gap: 9px;
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  background: #fff;
+  font-size: 11px;
+}
+
+.candidate-list li.is-hormone-therapy,
+.candidate-list li.is-endocrine-related {
+  grid-template-columns: 9px minmax(0, 1fr) auto auto;
+  border-color: color-mix(in srgb, var(--hormone-accent), white 68%);
+  background: var(--hormone-tint);
+}
+
+.candidate-list li.is-endocrine-related {
+  border-color: color-mix(in srgb, var(--endocrine-accent), white 65%);
+  background: var(--endocrine-tint);
+}
+
+.candidate-list li > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-list li > em {
+  color: var(--hormone-accent);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.candidate-list li.is-endocrine-related > em {
+  color: var(--endocrine-accent);
+}
+
+.candidate-list li > small {
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+
+.candidate-swatch {
+  width: 9px;
+  height: 22px;
+  border-radius: 2px;
 }
 
 .action-badge {
@@ -2837,6 +3006,36 @@ button:disabled {
     max-height: 116px;
     grid-template-columns: 1fr;
     padding: 8px 10px;
+  }
+
+  .result-summary.is-hormone-therapy,
+  .result-summary.is-endocrine-related {
+    padding-left: 16px;
+  }
+
+  .medicine-highlight-legend {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .candidate-list-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .candidate-list-heading small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .candidate-list li.is-hormone-therapy,
+  .candidate-list li.is-endocrine-related {
+    grid-template-columns: 9px minmax(0, 1fr) auto;
+  }
+
+  .candidate-list li > em {
+    grid-column: 2 / -1;
   }
 
   .header-inner {

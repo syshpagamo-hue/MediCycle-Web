@@ -1,23 +1,10 @@
 import * as ort from 'onnxruntime-web/webgpu'
+import { MEDICYCLE_CLASS_NAMES } from '../medicineMeta'
+
+export { MEDICYCLE_CLASS_NAMES } from '../medicineMeta'
 
 const MODEL_URL = '/models/best.onnx'
 const DEFAULT_INPUT_SIZE = 640
-
-export const MEDICYCLE_CLASS_NAMES = [
-  'canagliflozin',
-  'femara',
-  'henformin',
-  'januvia',
-  'kombiglyze',
-  'methimazole',
-  'nolvadex',
-  'onglyza',
-  'oseni',
-  'panbiotic',
-  'qtern',
-  'repaglinide',
-  'trajenta',
-] as const
 
 export type InferenceStage = 'loading-model' | 'preprocessing' | 'running'
 export type InferenceBackend = 'webgpu' | 'wasm'

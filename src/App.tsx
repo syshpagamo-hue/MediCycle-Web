@@ -45,6 +45,12 @@ import {
 } from './progress'
 import { useI18n } from './i18n'
 import {
+  getMedicineColor,
+  getMedicineDisplayName,
+  getMedicineMeta,
+  type MedicineCategory,
+} from './medicineMeta'
+import {
   MEDICYCLE_CLASS_NAMES,
   ModelUnavailableError,
   runYoloInference,
@@ -125,6 +131,15 @@ function App() {
     () => window.location.hash === pageHash.result,
   )
   const recycledCount = savedProgress.marineCollection.length
+  const predictionMeta = prediction
+    ? getMedicineMeta(prediction.label)
+    : undefined
+
+  const medicineCategoryLabel = (category: MedicineCategory) => {
+    if (category === 'hormone-therapy') return t('hormoneTherapy')
+    if (category === 'endocrine-related') return t('endocrineRelated')
+    return t('otherUnclassified')
+  }
 
   useEffect(() => {
     const onPopState = () => {
@@ -941,9 +956,19 @@ function App() {
               {preview && <DetectionPreview src={preview} alt={t('analyzedMedicinePreview')} detections={detections} />}
               {preview && <div className="preview-disclaimer">{t('detectionOverlay')}</div>}
             </div>
-            <div className="result-summary">
+            <div className={`result-summary${predictionMeta?.highlight ? ` is-${predictionMeta.category}` : ''}`}>
               <p className="eyebrow">{prediction && prediction.confidence >= 0.7 ? t('likelyMatch') : t('possibleMatch')}</p>
-              <h1>{result.drugName}</h1><p className="category-line">{t('resultCategory')}</p>
+              <h1>{prediction ? getMedicineDisplayName(prediction.label) : result.drugName}</h1><p className="category-line">{t('resultCategory')}</p>
+              {predictionMeta?.highlight && (
+                <p className={`medicine-category is-${predictionMeta.category}`}>
+                  <span aria-hidden="true" />
+                  {medicineCategoryLabel(predictionMeta.category)}
+                </p>
+              )}
+              <div className="medicine-highlight-legend" aria-label={t('classificationLegend')}>
+                <span className="is-hormone-therapy"><i aria-hidden="true" />{t('hormoneTherapy')}</span>
+                <span className="is-endocrine-related"><i aria-hidden="true" />{t('endocrineRelated')}</span>
+              </div>
               {prediction && (
                 <div className="confidence-meter">
                   <div><span>{t('confidence')}</span><b>{(prediction.confidence * 100).toFixed(1)}%</b></div>
@@ -951,6 +976,25 @@ function App() {
                   <small>{t('inferenceBackend', { backend: prediction.backend.toUpperCase(), ms: Math.round(prediction.inferenceMs) })}</small>
                 </div>
               )}
+              <div className="candidate-list">
+                <div className="candidate-list-heading">
+                  <b>{t('detectedCandidates')}</b>
+                  <small>{t('classificationMappingNote')}</small>
+                </div>
+                <ol>
+                  {detections.map((detection, index) => {
+                    const meta = getMedicineMeta(detection.label, detection.classId)
+                    return (
+                      <li className={meta?.highlight ? `is-${meta.category}` : undefined} key={`${detection.classId}-${index}`}>
+                        <span className="candidate-swatch" style={{ backgroundColor: getMedicineColor(detection.label, detection.classId) }} aria-hidden="true" />
+                        <b>{getMedicineDisplayName(detection.label, detection.classId)}</b>
+                        {meta?.highlight && <em>{medicineCategoryLabel(meta.category)}</em>}
+                        <small>{(detection.confidence * 100).toFixed(1)}%</small>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </div>
               <div className={`action-badge ${result.action}`}><span aria-hidden="true">{result.action === 'return' ? '↗' : '✓'}</span>{t('returnProfessional')}</div>
               <div className="demo-result-notice"><b>{t('candidateOnly')}</b><span>{t('resultNotice')}</span></div>
               <p className="medical-disclaimer">{t('medicalDisclaimer')}</p>
