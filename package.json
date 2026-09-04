@@ -10,6 +10,7 @@
     "sanity:inference": "node scripts/inference-sanity.mjs",
     "sanity:medicine-meta": "node --experimental-strip-types scripts/medicine-meta-sanity.mjs",
     "sanity:labels": "node --experimental-strip-types scripts/label-layout-sanity.mjs",
+    "sanity:overlay": "node --experimental-strip-types scripts/overlay-stability-sanity.mjs",
     "sanity:pharmacy-locale": "node --experimental-strip-types scripts/pharmacy-locale-sanity.mjs",
     "sanity:quiz": "node --experimental-strip-types scripts/quiz-sanity.mjs",
     "preview": "vite preview"

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Detection } from './inference/yolo'
 import { layoutDetectionLabels, type LayoutRect } from './detectionLabelLayout'
+import {
+  normalizeOverlaySize,
+  resolveDenseMode,
+  type DenseModeDecision,
+} from './detectionOverlayStability'
 import { getMedicineColor, getMedicineDisplayName, getMedicineTextColor } from './medicineMeta'
 
 export function DetectionPreview({
@@ -12,29 +17,30 @@ export function DetectionPreview({
   alt: string
   detections: Detection[]
 }) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const denseModeDecisionRef = useRef<DenseModeDecision | null>(null)
+  const lastFrameKeyRef = useRef<string | null>(null)
+  const pendingFrameRef = useRef<number | null>(null)
   const [denseMode, setDenseMode] = useState(false)
 
   const draw = useCallback(() => {
+    const container = containerRef.current
     const wrapper = wrapperRef.current
     const image = imageRef.current
     const canvas = canvasRef.current
-    if (!wrapper || !image || !canvas || !image.naturalWidth || !image.naturalHeight) return
+    if (!container || !wrapper || !image || !canvas || !image.naturalWidth || !image.naturalHeight) return
 
-    const width = wrapper.clientWidth
-    const height = wrapper.clientHeight
     const pixelRatio = window.devicePixelRatio || 1
-    canvas.width = Math.round(width * pixelRatio)
-    canvas.height = Math.round(height * pixelRatio)
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${height}px`
+    const size = normalizeOverlaySize(wrapper.clientWidth, wrapper.clientHeight, pixelRatio)
+    const containerSize = normalizeOverlaySize(container.clientWidth, container.clientHeight, 1)
+    const { cssWidth: width, cssHeight: height } = size
+    if (!width || !height) return
 
     const context = canvas.getContext('2d')
     if (!context) return
-    context.scale(pixelRatio, pixelRatio)
-    context.clearRect(0, 0, width, height)
 
     const imageScale = Math.min(width / image.naturalWidth, height / image.naturalHeight)
     const renderedWidth = image.naturalWidth * imageScale
@@ -67,8 +73,41 @@ export function DetectionPreview({
       })),
       { x: offsetX, y: offsetY, width: renderedWidth, height: renderedHeight },
     )
-    const shouldUseDenseMode = detections.length > 0 && layout === null
-    setDenseMode((current) => current === shouldUseDenseMode ? current : shouldUseDenseMode)
+    const detectionKey = detections.map((detection) => [
+      detection.classId,
+      detection.label,
+      detection.confidence,
+      detection.x,
+      detection.y,
+      detection.width,
+      detection.height,
+    ].join(':')).join('|')
+    const modeKey = `${src}|${detectionKey}|${containerSize.cssWidth}x${containerSize.cssHeight}`
+    const decision = resolveDenseMode(
+      denseModeDecisionRef.current,
+      modeKey,
+      detections.length > 0 && layout === null,
+    )
+    denseModeDecisionRef.current = decision
+    setDenseMode((current) => current === decision.dense ? current : decision.dense)
+
+    const frameKey = [
+      modeKey,
+      `${width}x${height}`,
+      `${size.bitmapWidth}x${size.bitmapHeight}`,
+      `${image.naturalWidth}x${image.naturalHeight}`,
+      decision.dense ? 'dense' : 'labels',
+    ].join('|')
+    if (lastFrameKeyRef.current === frameKey) return
+    lastFrameKeyRef.current = frameKey
+
+    if (canvas.width !== size.bitmapWidth) canvas.width = size.bitmapWidth
+    if (canvas.height !== size.bitmapHeight) canvas.height = size.bitmapHeight
+    if (canvas.style.width !== `${width}px`) canvas.style.width = `${width}px`
+    if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    context.clearRect(0, 0, width, height)
+    context.font = `600 ${fontSize}px Arial, sans-serif`
 
     boxes.forEach(({ detection, rect }) => {
       const color = getMedicineColor(detection.label, detection.classId)
@@ -77,7 +116,7 @@ export function DetectionPreview({
       context.strokeRect(rect.x, rect.y, rect.width, rect.height)
     })
 
-    if (layout) {
+    if (!decision.dense && layout) {
       layout.forEach(({ id, rect, connector }) => {
         const detection = detections[id]
         const color = getMedicineColor(detection.label, detection.classId)
@@ -115,21 +154,37 @@ export function DetectionPreview({
       })
       context.textAlign = 'start'
     }
-  }, [detections])
+  }, [detections, src])
+
+  const scheduleDraw = useCallback(() => {
+    if (pendingFrameRef.current !== null) return
+    pendingFrameRef.current = window.requestAnimationFrame(() => {
+      pendingFrameRef.current = null
+      draw()
+    })
+  }, [draw])
 
   useEffect(() => {
     draw()
+    const container = containerRef.current
     const wrapper = wrapperRef.current
-    if (!wrapper || !('ResizeObserver' in window)) return
-    const observer = new ResizeObserver(draw)
+    if (!container || !wrapper || !('ResizeObserver' in window)) return
+    const observer = new ResizeObserver(scheduleDraw)
+    observer.observe(container)
     observer.observe(wrapper)
-    return () => observer.disconnect()
-  }, [draw, src])
+    return () => {
+      observer.disconnect()
+      if (pendingFrameRef.current !== null) {
+        window.cancelAnimationFrame(pendingFrameRef.current)
+        pendingFrameRef.current = null
+      }
+    }
+  }, [draw, scheduleDraw])
 
   return (
-    <div className="annotated-image">
+    <div className="annotated-image" ref={containerRef}>
       <div className="annotated-image-stage" ref={wrapperRef}>
-        <img ref={imageRef} src={src} alt={alt} onLoad={draw} />
+        <img ref={imageRef} src={src} alt={alt} onLoad={scheduleDraw} />
         <canvas ref={canvasRef} aria-hidden="true" />
       </div>
       {denseMode && (
