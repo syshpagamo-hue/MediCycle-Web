@@ -2,35 +2,42 @@
 
 > **Recognize the medicine. Activate better choices.**
 
-MediCycle is a competition prototype that turns medication disposal into a clear, guided action. It combines private browser-side medication recognition, disposal guidance, nearby-pharmacy discovery, and ocean-impact learning to help users connect one household decision with a wider environmental outcome.
+MediCycle is a bilingual competition prototype that turns medication disposal into a clear, guided action. It combines real browser-side medication recognition, disposal guidance, live nearby-pharmacy discovery, a return plan, and ocean-impact learning to connect one household decision with a wider environmental outcome.
 
-中文簡介：MediCycle 透過藥物處理引導、附近藥局搜尋與海洋教育，把正確回收行動轉化為容易理解且可持續的互動流程。
+中文摘要：MediCycle 提供全站中英文介面，使用 YOLO11n ONNX 在瀏覽器內進行真實藥物候選辨識，並結合 OpenStreetMap 附近藥局搜尋、回收計畫、Fish / Ocean 收藏及附可信來源的詳細測驗解析。辨識結果僅供候選參考，不是醫療診斷。
 
 ![MediCycle homepage with the hormone medication disposal hero and primary call to action](public/readme/hero.png)
 
 ## Product Walkthrough
 
-### AI candidate and disposal guidance
+### Real browser inference / 真實瀏覽器辨識
 
-The YOLO11 model analyzes the selected photo on-device and shows a medicine-name candidate with its confidence. Results are deliberately framed as candidates, never as diagnosis or treatment advice, and connect only to general medication-return education.
+The included YOLO11n ONNX model analyzes the selected photo on-device. The real result below was produced by MediCycle in the browser from a user-provided medicine photo; it shows the rendered bounding boxes, medicine-name candidates, and confidence scores. Results are deliberately framed as candidates—never diagnosis, dosing, or treatment advice—and connect only to general medication-return education.
 
-![Fixed Ethinyl Estradiol demonstration result and professional collection guidance](public/readme/demo-result.png)
+![Real MediCycle browser inference result showing multiple bounding boxes, medicine-name candidates, and confidence scores](public/readme/recognition-result.png)
 
-### Marine Life collection
+### Nearby Pharmacy / 附近藥局
 
-Completing the guided disposal simulation unlocks marine life cards, making the environmental consequence of a small household action visible and memorable.
+Nearby Pharmacy uses browser geolocation and a same-origin Cloudflare Pages Function to query real OpenStreetMap Overpass data. Results are shown on an interactive Leaflet map, sorted nearest first, and retain the original OSM names and addresses. A location is a nearby pharmacy—not a verified medication take-back point—so the user is asked to contact it before visiting. The screenshot below uses the clearly labeled sample-data mode so it does not imply verified take-back availability.
+
+![MediCycle Nearby Pharmacy interactive Leaflet map](public/readme/pharmacy-map.png)
+
+### Fish / Ocean collection
+
+Planning a return and recording the guided hand-off unlocks marine-life cards. My Ocean turns the environmental consequence of a small household action into visible, persistent progress.
 
 ![MediCycle Marine Life collection experience](public/readme/marine-collection.png)
 
 ## Features
 
-- **Live browser inference** — runs the included YOLO11 ONNX model with WebGPU when available and automatically falls back to WASM.
+- **Live browser inference** — runs the included YOLO11n ONNX model with WebGPU when available and automatically falls back to WASM.
 - **Camera and upload** — supports camera capture, file selection, drag-and-drop, local preview, file-type validation, and a 10 MB size limit. Selected images are analyzed locally and are not uploaded or stored by MediCycle.
 - **AI medication-name candidates** — decodes the image, letterboxes it to `640 × 640`, creates an RGB NCHW Float32 tensor normalized to `0–1`, parses the `1 × 17 × 8400` YOLO11 output, applies confidence filtering and class-aware NMS, restores boxes to original image coordinates, and draws the detections.
-- **Disposal guidance** — explains the recommended action, why it matters, and the steps required for a safer medication hand-off.
+- **Bilingual product** — the full interface, recognition guidance, pharmacy flow, return plan, collection, and Quiz are available in English and Traditional Chinese.
+- **Disposal and return plan** — explains why responsible disposal matters, helps the user choose a pharmacy to contact, records a return option, and guides the simulated hand-off.
 - **Nearby pharmacies** — sends browser geolocation to a same-origin Cloudflare Pages Function, which validates coordinates and queries multiple OpenStreetMap Overpass providers before returning normalized nearest-first results to the Leaflet map.
 - **Marine Life collection** — rewards simulated completion with six unlockable species cards and environmental impact stories.
-- **Six-question Quiz** — checks understanding of pharmaceutical pollution, responsible disposal, aquatic impact, and AI's intended role.
+- **Six-question Quiz** — checks pharmaceutical-pollution, disposal, aquatic-impact, and AI-role knowledge. Every submitted answer includes a bilingual detailed explanation, why the correct option is right, why the other options do not fit, and clickable sources from organizations and research databases such as the US EPA, FDA, USGS, and PubMed.
 - **Prototype account** — uses a phone number and six-digit PIN (not SMS verification) to restore progress across devices. Phone and PIN values are never stored in plaintext; D1 stores a keyed phone hash and a salted PBKDF2 PIN derivation.
 - **Resilient progress** — synchronizes Marine Life, Quiz, return-plan, and demo-completion progress to Cloudflare D1 while retaining `localStorage` as an offline fallback.
 
@@ -50,7 +57,7 @@ Completing the guided disposal simulation unlocks marine life cards, making the 
 flowchart LR
     A[React + TypeScript + Vite] --> B[Camera / Upload]
     B --> C[ONNX Runtime Web<br/>WebGPU → WASM]
-    C --> D[YOLO11 ONNX<br/>13 medicine classes]
+    C --> D[YOLO11n ONNX<br/>13 medicine classes]
     D --> E[Candidate + confidence<br/>general disposal guidance]
     E --> F[Cloudflare Pages Function]
     F --> L[OpenStreetMap Overpass<br/>multi-endpoint fallback]
@@ -78,7 +85,22 @@ flowchart LR
 | Account persistence | Cloudflare D1 | Stores hashed account credentials, sessions, and cross-device progress |
 | Offline persistence | `localStorage` | Stores non-identifying progress on the current device; never stores the phone number |
 | Browser inference | ONNX Runtime Web | WebGPU-first inference with a WASM fallback |
-| Vision model | YOLO11 ONNX | 13-class medication detector, ONNX opset 17 |
+| Vision model | YOLO11n ONNX | 13-class medication detector, 640 × 640 input, ONNX opset 17 |
+
+## Model Card
+
+| Item | Current value |
+| --- | --- |
+| Architecture | Ultralytics YOLO11n object detector |
+| Classes | 13 medication classes |
+| Input | `1 × 3 × 640 × 640` RGB NCHW Float32 |
+| ONNX size | Approximately 10.1 MB (`10,613,686` bytes in this repository) |
+| Browser execution | ONNX Runtime Web; WebGPU first, WASM fallback |
+| Reference WebGPU inference | Approximately 410 ms in the existing test environment; hardware, browser, warm-up, and image conditions affect timing |
+| Test mAP50 | Approximately 0.844 |
+| Test mAP50–95 | Approximately 0.592 |
+
+These evaluation metrics describe performance on the model's test dataset; they do not establish clinical accuracy or safety. MediCycle presents detections as medication-name candidates with confidence scores. It must not be used to diagnose a condition, decide treatment, determine dosage, or start, stop, or change medication. Confirm the medicine from its original packaging or with a qualified professional.
 
 ## Current Status
 
@@ -89,12 +111,15 @@ MediCycle is a **prototype / competition demo**, not a production medical identi
 | Responsive UX and guided demo flow | Complete for the prototype |
 | Camera/upload and local inference | Complete |
 | Confidence policy and detection overlay | Complete |
-| Nearby-pharmacy proxy and Leaflet map | Implemented; requires Pages Functions deployment; take-back availability remains unverified |
-| Prototype account and D1 progress sync | Implemented; requires the D1 binding, migration, and pepper secret described below |
+| Cloudflare Pages deployment | Connected to the GitHub `main` branch; static UI and Pages Functions share one deployment target |
+| Nearby Pharmacy | Real OSM/Overpass search and Leaflet map implemented with 2/5/10 km expansion and multi-provider fallback; take-back availability remains unverified |
+| English / Traditional Chinese | Complete across the main product flow, including pharmacy search and Quiz explanations |
+| Prototype account and D1 progress sync | Account/session/progress APIs and migration implemented; deployment still requires the `DB` binding, migration, and pepper secret described below |
 | Marine Life collection and offline progress | Complete |
-| Six-question Quiz, scoring, and restart | Complete |
+| Return plan and guided completion | Complete for the prototype |
+| Six-question Quiz, scoring, restart, detailed explanations, and trusted links | Complete |
 | ONNX preprocessing and inference module | Integrated |
-| YOLO11 medication model | Included at `public/models/best.onnx` |
+| YOLO11n medication model | Included at `public/models/best.onnx` |
 | Medication-name candidates | Enabled; explicitly not a diagnosis |
 
 The prototype does not provide medical advice. Medicine identity and local disposal requirements should be confirmed with a qualified professional or authorized collection program.
@@ -120,7 +145,7 @@ The Vite server is sufficient for UI-only work. The production build is written 
 
 ## Deployment
 
-Cloudflare Pages automatically deploys updates from the GitHub `main` branch. The Pages project needs a D1 binding and secret before the new APIs can serve account requests.
+Cloudflare Pages is the deployment target and automatically builds updates from the GitHub `main` branch. The repository includes the D1 account/progress APIs and migration; a Pages environment needs the `DB` binding, applied migration, and secret below before those APIs can serve account requests.
 
 | Setting | Value |
 | --- | --- |
