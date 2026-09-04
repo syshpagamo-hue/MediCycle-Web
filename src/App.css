@@ -182,7 +182,7 @@ button:disabled {
 .hero-artwork {
   display: block;
   width: 100%;
-  height: auto;
+  height: min(560px, 56vw);
   object-fit: cover;
 }
 
