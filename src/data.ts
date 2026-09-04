@@ -51,14 +51,14 @@ export const quizQuestions: QuizQuestion[] = [
   {
     id: 'ee2-marine-fish-impact',
     question:
-      'What impact does ethinyl estradiol (EE2), a common component of oral contraceptives, have on marine fish like clownfish when it enters water bodies?',
+      'What impact can ethinyl estradiol (EE2), a synthetic estrogen used in some oral contraceptives, have on fish when it enters aquatic environments?',
     options: [
       {
         id: 'A',
-        text: 'It induces feminization in male fish, affects sperm/egg development, alters behavior, and may lead to population collapse.',
+        text: 'It can feminize male fish, disrupt reproductive development and behavior, reduce reproductive success, and in severe long-term exposure contribute to population decline.',
       },
       { id: 'B', text: 'It causes fish to grow abnormally large.' },
-      { id: 'C', text: 'It damages fish gills, causing immediate suffocation.' },
+      { id: 'C', text: 'It immediately damages fish gills and causes suffocation.' },
       { id: 'D', text: 'It changes fish scale colors to help them escape predators.' },
     ],
     correctOptionId: 'A',
@@ -66,11 +66,11 @@ export const quizQuestions: QuizQuestion[] = [
   {
     id: 'medication-path-to-ocean',
     question:
-      'How do waste medications used by humans (such as birth control pills, antidepressants, and painkillers) mainly enter the ocean to disrupt coral reefs and marine life?',
+      'How do pharmaceuticals used by humans mainly enter aquatic environments and eventually affect marine life?',
     options: [
       { id: 'A', text: 'High-temperature exhaust gas directly emitted by factories' },
       { id: 'B', text: 'Plastic garbage dumped at sea by ships' },
-      { id: 'C', text: 'Household wastewater and improper drug disposal' },
+      { id: 'C', text: 'Human excretion, household wastewater, and improper medication disposal' },
       { id: 'D', text: 'Chemical substances released by underwater volcanic eruptions' },
     ],
     correctOptionId: 'C',
@@ -79,7 +79,7 @@ export const quizQuestions: QuizQuestion[] = [
     id: 'importance-of-proper-disposal',
     question: 'Why is proper medication disposal important?',
     options: [
-      { id: 'A', text: 'It protects the environment.' },
+      { id: 'A', text: 'It helps prevent pharmaceutical pollution and protects aquatic ecosystems.' },
       { id: 'B', text: "It changes the medicine's color." },
       { id: 'C', text: 'It makes medicine cheaper.' },
       { id: 'D', text: 'It increases plastic recycling.' },
@@ -88,31 +88,34 @@ export const quizQuestions: QuizQuestion[] = [
   },
   {
     id: 'hormone-medication-disposal',
-    question: 'Where should hormone medications be disposed of?',
+    question: 'What is generally the preferred way to dispose of unused hormone medications?',
     options: [
-      { id: 'A', text: 'Household trash' },
+      { id: 'A', text: 'Throw them directly into household trash' },
       { id: 'B', text: 'Flush them down the toilet' },
-      { id: 'C', text: 'A designated pharmacy or medical collection point' },
-      { id: 'D', text: 'Recycling bin' },
+      { id: 'C', text: 'Use an authorized medication take-back or collection program' },
+      { id: 'D', text: 'Put them in a household recycling bin' },
     ],
     correctOptionId: 'C',
   },
   {
-    id: 'marine-animal-water-pollution',
-    question: 'Which marine animal is most affected by water pollution?',
+    id: 'pharmaceutical-harm-to-aquatic-animals',
+    question: 'Why can pharmaceutical pollution be harmful to aquatic animals?',
     options: [
-      { id: 'A', text: 'Sea turtle' },
-      { id: 'B', text: 'Eagle' },
-      { id: 'C', text: 'Panda' },
-      { id: 'D', text: 'Butterfly' },
+      {
+        id: 'A',
+        text: 'Pharmaceuticals are biologically active and can affect reproduction, development, physiology, or behavior.',
+      },
+      { id: 'B', text: 'They always make seawater warmer.' },
+      { id: 'C', text: 'They increase the amount of oxygen in water.' },
+      { id: 'D', text: 'They turn medicines into microplastics.' },
     ],
     correctOptionId: 'A',
   },
   {
     id: 'ai-system-role',
-    question: 'What does AI help our system do?',
+    question: 'What does AI help MediCycle do?',
     options: [
-      { id: 'A', text: 'Identify medications' },
+      { id: 'A', text: 'Analyze an image to help identify the medication.' },
       { id: 'B', text: 'Produce medicine' },
       { id: 'C', text: 'Deliver medicine' },
       { id: 'D', text: 'Sell medicine' },
