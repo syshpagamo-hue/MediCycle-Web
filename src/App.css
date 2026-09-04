@@ -1152,8 +1152,61 @@ button:disabled {
   gap: 18px;
 }
 
-.pharmacy-list {
+.pharmacy-results-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
+  gap: 44px;
+  align-items: start;
   margin-top: 42px;
+}
+
+.pharmacy-map {
+  position: sticky;
+  top: 100px;
+  overflow: hidden;
+  height: 560px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--blue-light);
+}
+
+.pharmacy-map .leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.pharmacy-map .leaflet-control-attribution {
+  font-size: 9px;
+}
+
+.map-marker-shell {
+  border: 0;
+  background: transparent;
+}
+
+.map-marker {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 9px rgb(0 0 0 / 28%);
+}
+
+.map-marker.pharmacy-marker {
+  background: var(--figma-blue);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.map-marker.user-marker {
+  background: #111;
+}
+
+.pharmacy-list {
   border-top: 1px solid var(--black);
 }
 
@@ -1164,6 +1217,21 @@ button:disabled {
   align-items: start;
   padding: 28px 0;
   border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 150ms ease, padding 150ms ease;
+}
+
+.pharmacy-row:hover,
+.pharmacy-row.is-selected,
+.pharmacy-row:focus-visible {
+  padding-right: 12px;
+  padding-left: 12px;
+  background: #f4fafc;
+}
+
+.pharmacy-row:focus-visible {
+  outline: 2px solid var(--figma-blue);
+  outline-offset: 2px;
 }
 
 .pharmacy-number {
@@ -1220,12 +1288,16 @@ button:disabled {
 
 .pharmacy-actions > div {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 7px;
 }
 
-.pharmacy-actions a {
+.pharmacy-actions a,
+.pharmacy-actions .map-focus-button {
   display: inline-block;
   border-radius: 4px;
+  border: 0;
   padding: 11px 13px;
   background: var(--figma-blue);
   color: #fff;
@@ -1233,9 +1305,11 @@ button:disabled {
   font-weight: 700;
   text-decoration: none;
   transition: filter 150ms ease, transform 150ms ease;
+  cursor: pointer;
 }
 
-.pharmacy-actions .phone-link {
+.pharmacy-actions .phone-link,
+.pharmacy-actions .map-focus-button {
   border: 1px solid var(--line);
   background: #fff;
   color: #555;
@@ -2315,6 +2389,18 @@ button:disabled {
     gap: 22px;
   }
 
+  .pharmacy-results-layout {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .pharmacy-map {
+    position: relative;
+    top: auto;
+    width: 100%;
+    height: 340px;
+  }
+
   .pharmacy-row {
     grid-template-columns: 34px minmax(0, 1fr);
     gap: 12px;
@@ -2341,6 +2427,10 @@ button:disabled {
     grid-column: 2;
     min-width: 0;
     align-items: flex-start;
+  }
+
+  .pharmacy-actions > div {
+    justify-content: flex-start;
   }
 
   .result-page > .process-steps {

@@ -7,6 +7,7 @@ import {
 } from 'react'
 import './App.css'
 import { DetectionPreview } from './DetectionPreview'
+import { PharmacyMap } from './PharmacyMap'
 import { Quiz } from './Quiz'
 import {
   ActivityBanner,
@@ -22,10 +23,19 @@ import {
   fixedDemoCase,
   pageHash,
   type AnalysisResult,
+  type Coordinates,
   type LocatorState,
   type PageName,
   type Pharmacy,
 } from './data'
+import {
+  buildOverpassQuery,
+  pharmaciesFromOverpass,
+  PHARMACY_RESULT_LIMIT,
+  SEARCH_RADII_METERS,
+  sortByDistance,
+  type OverpassResponse,
+} from './pharmacy'
 
 const DEMO_PROGRESS_KEY = 'medicycle-demo-recycled-count'
 const LEGACY_PROGRESS_KEY = 'medicine-recycled'
@@ -37,45 +47,6 @@ type CameraState =
   | 'ready'
   | 'permission-denied'
   | 'unavailable'
-
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const toRad = (value: number) => (value * Math.PI) / 180
-  const earthRadius = 6371
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2
-  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-function sortByDistance(
-  items: Omit<Pharmacy, 'distance'>[],
-  lat: number,
-  lon: number,
-) {
-  return items
-    .map((item) => ({ ...item, distance: haversine(lat, lon, item.lat, item.lon) }))
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 5)
-}
-
-function addressFromTags(tags: Record<string, string>) {
-  if (tags['addr:full:en']) return tags['addr:full:en']
-  if (tags['addr:full']) return tags['addr:full']
-  return (
-    [
-      tags['addr:housenumber'],
-      tags['addr:street:en'] || tags['addr:street'],
-      tags['addr:district:en'] || tags['addr:district'],
-      tags['addr:city:en'] || tags['addr:city'],
-    ]
-      .filter(Boolean)
-      .join(', ') || 'Address not listed'
-  )
-}
 
 function getStoredProgress() {
   try {
@@ -96,6 +67,8 @@ function App() {
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
   const cameraStreamRef = useRef<MediaStream | null>(null)
   const cameraAttemptRef = useRef(0)
+  const pharmacySearchAttemptRef = useRef(0)
+  const pharmacySearchControllerRef = useRef<AbortController | null>(null)
   const uploadRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLElement>(null)
   const dialogCloseRef = useRef<HTMLButtonElement>(null)
@@ -110,6 +83,9 @@ function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [locatorState, setLocatorState] = useState<LocatorState>('idle')
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
+  const [mapCenter, setMapCenter] = useState<Coordinates | null>(null)
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null)
+  const [searchRadiusKm, setSearchRadiusKm] = useState<number | null>(null)
   const [toast, setToast] = useState('')
   const [unlockedCard, setUnlockedCard] = useState<(typeof marineCards)[number] | null>(null)
   const [recycledCount, setRecycledCount] = useState(getStoredProgress)
@@ -141,6 +117,8 @@ function App() {
 
   useEffect(() => () => {
     cameraAttemptRef.current += 1
+    pharmacySearchAttemptRef.current += 1
+    pharmacySearchControllerRef.current?.abort()
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
     cameraStreamRef.current = null
   }, [])
@@ -247,10 +225,15 @@ function App() {
   }
 
   const resetAnalysisState = () => {
+    pharmacySearchAttemptRef.current += 1
+    pharmacySearchControllerRef.current?.abort()
     setResult(null)
     setRecycledForResult(false)
     setLocatorState('idle')
     setPharmacies([])
+    setMapCenter(null)
+    setSelectedPharmacyId(null)
+    setSearchRadiusKm(null)
     setReturnPlanConfirmed(false)
   }
 
@@ -334,71 +317,84 @@ function App() {
   }
 
   const showFallbackLocation = (lat = 24.1795, lon = 120.6465) => {
+    pharmacySearchAttemptRef.current += 1
+    pharmacySearchControllerRef.current?.abort()
     setReturnPlanConfirmed(false)
     setPharmacies(sortByDistance(fallbackPharmacies, lat, lon))
+    setMapCenter({ lat, lon })
+    setSelectedPharmacyId(null)
+    setSearchRadiusKm(null)
     setLocatorState('fallback')
   }
 
   const locatePharmacies = () => {
+    const attempt = pharmacySearchAttemptRef.current + 1
+    pharmacySearchAttemptRef.current = attempt
+    pharmacySearchControllerRef.current?.abort()
     setReturnPlanConfirmed(false)
     if (!navigator.geolocation) {
-      showFallbackLocation()
+      setLocatorState('location-error')
+      setPharmacies([])
+      setMapCenter(null)
       return
     }
     setLocatorState('locating')
     setPharmacies([])
+    setMapCenter(null)
+    setSelectedPharmacyId(null)
+    setSearchRadiusKm(null)
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
+        if (attempt !== pharmacySearchAttemptRef.current) return
         const { latitude, longitude } = coords
         const controller = new AbortController()
+        pharmacySearchControllerRef.current = controller
         const timeoutId = window.setTimeout(
           () => controller.abort(),
           OVERPASS_TIMEOUT_MS,
         )
         try {
-          const query = `[out:json][timeout:10];(node["amenity"="pharmacy"](around:3500,${latitude},${longitude});way["amenity"="pharmacy"](around:3500,${latitude},${longitude}););out center tags;`
-          const response = await fetch(
-            `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-            { signal: controller.signal },
-          )
-          if (response.status === 408 || response.status === 504) {
-            throw new DOMException('Map service timed out', 'AbortError')
+          let nearby: Omit<Pharmacy, 'distance'>[] = []
+          let radiusUsed = SEARCH_RADII_METERS[SEARCH_RADII_METERS.length - 1]
+
+          for (const radius of SEARCH_RADII_METERS) {
+            const query = buildOverpassQuery(latitude, longitude, radius)
+            const response = await fetch(
+              'https://overpass-api.de/api/interpreter',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                },
+                body: `data=${encodeURIComponent(query)}`,
+                signal: controller.signal,
+              },
+            )
+            if (response.status === 408 || response.status === 504) {
+              throw new DOMException('Map service timed out', 'AbortError')
+            }
+            if (!response.ok) throw new Error('Map service failed')
+            const data = (await response.json()) as OverpassResponse
+            nearby = pharmaciesFromOverpass(data.elements)
+            radiusUsed = radius
+            if (nearby.length >= PHARMACY_RESULT_LIMIT) break
           }
-          if (!response.ok) throw new Error('Map service failed')
-          const data = (await response.json()) as {
-            elements: Array<{
-              id: number
-              lat?: number
-              lon?: number
-              center?: { lat: number; lon: number }
-              tags?: Record<string, string>
-            }>
-          }
-          const nearby = data.elements
-            .map((element): Omit<Pharmacy, 'distance'> | null => {
-              const lat = element.lat ?? element.center?.lat
-              const lon = element.lon ?? element.center?.lon
-              if (lat === undefined || lon === undefined) return null
-              const tags = element.tags ?? {}
-              return {
-                id: String(element.id),
-                name: tags['name:en'] || tags.name || 'Community Pharmacy',
-                lat,
-                lon,
-                address: addressFromTags(tags),
-                phone: tags.phone,
-                takeBackStatus: 'unverified',
-              }
-            })
-            .filter((item): item is Omit<Pharmacy, 'distance'> => item !== null)
+
+          if (attempt !== pharmacySearchAttemptRef.current) return
           if (!nearby.length) {
             setLocatorState('empty')
+            setMapCenter({ lat: latitude, lon: longitude })
+            setSearchRadiusKm(radiusUsed / 1000)
             return
           }
           setPharmacies(sortByDistance(nearby, latitude, longitude))
+          setMapCenter({ lat: latitude, lon: longitude })
+          setSearchRadiusKm(radiusUsed / 1000)
           setLocatorState('ready')
         } catch (error) {
+          if (attempt !== pharmacySearchAttemptRef.current) return
           setPharmacies([])
+          setMapCenter({ lat: latitude, lon: longitude })
           setLocatorState(
             error instanceof DOMException && error.name === 'AbortError'
               ? 'timeout'
@@ -406,11 +402,16 @@ function App() {
           )
         } finally {
           window.clearTimeout(timeoutId)
+          if (pharmacySearchControllerRef.current === controller) {
+            pharmacySearchControllerRef.current = null
+          }
         }
       },
-      () => {
-        setLocatorState('location-error')
+      (error) => {
+        if (attempt !== pharmacySearchAttemptRef.current) return
+        setLocatorState(error.code === error.TIMEOUT ? 'location-timeout' : 'location-error')
         setPharmacies([])
+        setMapCenter(null)
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     )
@@ -492,7 +493,7 @@ function App() {
         <p className="location-note" role="status">Allow location access when your browser asks. This usually takes a few seconds.</p>
       )}
       {locatorState === 'ready' && (
-        <p className="location-note" role="status">Live pharmacy results · take-back availability is not verified</p>
+        <p className="location-note" role="status">Live OpenStreetMap results within {searchRadiusKm} km · sorted nearest first · take-back availability is not verified</p>
       )}
       {locatorState === 'fallback' && (
         <p className="location-note demo-note" role="status"><b>DEMO DATA</b> Showing sample pharmacies near Xitun District, Taichung.</p>
@@ -500,6 +501,12 @@ function App() {
       {locatorState === 'location-error' && (
         <div className="location-error" role="alert">
           <p>We could not access your location. Enable Location Services for your browser, then try again.</p>
+          <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
+        </div>
+      )}
+      {locatorState === 'location-timeout' && (
+        <div className="location-error" role="alert">
+          <p>Your browser could not determine your location within 8 seconds. Check Location Services and try again.</p>
           <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
         </div>
       )}
@@ -517,34 +524,60 @@ function App() {
       )}
       {locatorState === 'empty' && (
         <div className="location-error" role="status">
-          <p>No pharmacies were found within 3.5 km. Try again or view sample results to continue the demo.</p>
+          <p>No pharmacies were found within 10 km. Try again or view clearly labeled sample results to continue the demo.</p>
           <div><button type="button" className="text-button" onClick={locatePharmacies}>RETRY</button><button type="button" className="text-button" onClick={() => showFallbackLocation()}>VIEW SAMPLE RESULTS INSTEAD</button></div>
         </div>
       )}
-      {pharmacies.length > 0 && (
-        <div className="pharmacy-list" aria-live="polite">
-          {pharmacies.slice(0, 3).map((pharmacy, index) => (
-            <article className="pharmacy-row" key={pharmacy.id}>
-              <div className="pharmacy-number">{String(index + 1).padStart(2, '0')}</div>
-              <div className="pharmacy-copy">
-                <h3>{pharmacy.name}</h3>
-                <p>{pharmacy.address}</p>
-                <small className={`verification-label is-${pharmacy.takeBackStatus}`}>
-                  {pharmacy.takeBackStatus === 'verified'
-                    ? 'VERIFIED RETURN POINT'
-                    : 'UNVERIFIED · CONTACT THE PHARMACY TO CONFIRM MEDICATION TAKE-BACK AVAILABILITY'}
-                </small>
-              </div>
-              <div className="pharmacy-actions">
-                <strong>{pharmacy.distance < 1 ? `${Math.round(pharmacy.distance * 1000)} m` : `${pharmacy.distance.toFixed(1)} km`}</strong>
-                <div>
-                  {pharmacy.phone && <a className="phone-link" href={`tel:${pharmacy.phone}`}>CALL</a>}
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.lat},${pharmacy.lon}`} target="_blank" rel="noreferrer">DIRECTIONS</a>
-                </div>
-              </div>
-            </article>
-          ))}
-          <p className="data-source">Locations come from open map data. This version does not yet include a verified return-point data source.</p>
+      {pharmacies.length > 0 && mapCenter && (
+        <div aria-live="polite">
+          <div className="pharmacy-results-layout">
+            <PharmacyMap
+              center={mapCenter}
+              pharmacies={pharmacies}
+              selectedPharmacyId={selectedPharmacyId}
+              onSelectPharmacy={setSelectedPharmacyId}
+              centerLabel={locatorState === 'fallback' ? 'Sample search center' : 'Your location'}
+            />
+            <div className="pharmacy-list">
+              {pharmacies.map((pharmacy, index) => (
+                <article
+                  className={`pharmacy-row${selectedPharmacyId === pharmacy.id ? ' is-selected' : ''}`}
+                  key={pharmacy.id}
+                  aria-label={`Show ${pharmacy.name} on the map`}
+                  onClick={() => setSelectedPharmacyId(pharmacy.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setSelectedPharmacyId(pharmacy.id)
+                    }
+                  }}
+                  tabIndex={0}
+                >
+                  <div className="pharmacy-number">{String(index + 1).padStart(2, '0')}</div>
+                  <div className="pharmacy-copy">
+                    <h3>{pharmacy.name}</h3>
+                    <p>{pharmacy.address}</p>
+                    {pharmacy.phone && <small>Phone: {pharmacy.phone}</small>}
+                    {pharmacy.openingHours && <small>Hours: {pharmacy.openingHours}</small>}
+                    <small className={`verification-label is-${pharmacy.takeBackStatus}`}>
+                      {pharmacy.takeBackStatus === 'osm-listed'
+                        ? 'OSM-LISTED DRUG RECYCLING · NOT OFFICIALLY VERIFIED · CONTACT PHARMACY TO CONFIRM'
+                        : 'UNVERIFIED MEDICATION TAKE-BACK · CONTACT PHARMACY TO CONFIRM'}
+                    </small>
+                  </div>
+                  <div className="pharmacy-actions">
+                    <strong>{pharmacy.distance < 1 ? `${Math.round(pharmacy.distance * 1000)} m` : `${pharmacy.distance.toFixed(1)} km`}</strong>
+                    <div>
+                      <button type="button" className="map-focus-button" onClick={(event) => { event.stopPropagation(); setSelectedPharmacyId(pharmacy.id) }}>SHOW ON MAP</button>
+                      {pharmacy.phone && <a className="phone-link" href={`tel:${pharmacy.phone}`} onClick={(event) => event.stopPropagation()}>CALL</a>}
+                      <a href={`https://www.google.com/maps/dir/?api=1&destination=${pharmacy.lat},${pharmacy.lon}`} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>DIRECTIONS</a>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+          <p className="data-source">Pharmacy locations and details come from OpenStreetMap contributors. OSM pharmacy data does not verify medication take-back participation.</p>
           {page === 'result' && (
             <div className="return-plan-action">
               <div>

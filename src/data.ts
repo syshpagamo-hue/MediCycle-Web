@@ -13,8 +13,14 @@ export type Pharmacy = {
   lon: number
   address: string
   phone?: string
+  openingHours?: string
   distance: number
-  takeBackStatus: 'verified' | 'unverified'
+  takeBackStatus: 'osm-listed' | 'unverified'
+}
+
+export type Coordinates = {
+  lat: number
+  lon: number
 }
 
 export type PageName = 'home' | 'result' | 'activity'
@@ -24,6 +30,7 @@ export type LocatorState =
   | 'ready'
   | 'fallback'
   | 'location-error'
+  | 'location-timeout'
   | 'timeout'
   | 'network-error'
   | 'empty'
@@ -150,6 +157,22 @@ export const fallbackPharmacies: Omit<Pharmacy, 'distance'>[] = [
     lat: 24.1745,
     lon: 120.6509,
     address: 'Section 3, Wenxin Road, Xitun District, Taichung',
+    takeBackStatus: 'unverified',
+  },
+  {
+    id: 'demo-4',
+    name: 'Blue Current Pharmacy',
+    lat: 24.1717,
+    lon: 120.6434,
+    address: 'Fuxing Road, Xitun District, Taichung',
+    takeBackStatus: 'unverified',
+  },
+  {
+    id: 'demo-5',
+    name: 'Ocean Care Pharmacy',
+    lat: 24.1868,
+    lon: 120.6531,
+    address: 'Qinghai Road, Xitun District, Taichung',
     takeBackStatus: 'unverified',
   },
 ]
