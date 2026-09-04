@@ -124,12 +124,12 @@ export const quizQuestions: QuizQuestion[] = [
   },
 ]
 
-export const fixedDemoCase: AnalysisResult = {
-  drugName: 'Ethinyl Estradiol 0.03 mg',
-  category: 'Fixed demonstration case | Hormonal medication',
+export const medicationReturnGuidance: AnalysisResult = {
+  drugName: '',
+  category: 'AI medication name candidate',
   action: 'return',
   reason:
-    'This fixed demonstration case represents unused hormonal medication. It should be returned to a medical institution or a confirmed collection point so active ingredients do not enter wastewater or get used accidentally.',
+    'If this medicine is unused or expired, keep it separate and contact a medical institution, pharmacy, or authorized collection program to confirm a suitable return option.',
   steps: [
     'Keep the medicine in its original packaging or medication bag.',
     'Do not flush it down a toilet or sink, and do not place it in household recycling.',

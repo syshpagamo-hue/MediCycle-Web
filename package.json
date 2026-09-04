@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -p functions/tsconfig.json --noEmit && tsc -b && vite build",
     "lint": "oxlint",
+    "sanity:inference": "node scripts/inference-sanity.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

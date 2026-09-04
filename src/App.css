@@ -705,6 +705,11 @@ button:disabled {
   display: block;
 }
 
+.inference-status p {
+  min-width: 0;
+  margin: 0;
+}
+
 .inference-status b {
   font-size: 12px;
 }
@@ -717,6 +722,22 @@ button:disabled {
 }
 
 .inference-status.is-error small {
+  color: #9a3f3f;
+}
+
+.inference-status.is-unreliable > span {
+  border-color: #d18a20;
+  background: #d18a20;
+}
+
+.inference-status.is-model-error > span,
+.inference-status.is-inference-error > span {
+  border-color: #d45b5b;
+  background: #d45b5b;
+}
+
+.inference-status.is-model-error small,
+.inference-status.is-inference-error small {
   color: #9a3f3f;
 }
 
@@ -1708,6 +1729,11 @@ button:disabled {
   line-height: 0.98;
   font-weight: 400;
   letter-spacing: -0.05em;
+  overflow-wrap: anywhere;
+}
+
+.result-summary {
+  min-width: 0;
 }
 
 .category-line {
@@ -1790,6 +1816,14 @@ button:disabled {
   display: block;
   height: 100%;
   background: var(--figma-blue);
+}
+
+.confidence-meter small {
+  display: block;
+  margin-top: 9px;
+  color: #8d8d8d;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .medical-disclaimer {

@@ -6,31 +6,29 @@ Place the exported browser-compatible ONNX model at:
 public/models/best.onnx
 ```
 
-The browser inference module expects a standard Ultralytics YOLO11 detection export:
+The browser inference module expects this MediCycle Ultralytics YOLO11 detection export:
 
-- One RGB image input, normally NCHW (`1 × 3 × height × width`)
+- One RGB image input in NCHW shape `1 × 3 × 640 × 640`
 - Float values normalized to `0–1`
-- Raw detection output shaped like `1 × (4 + classes) × predictions` or
-  `1 × predictions × (4 + classes)`
-- End-to-end NMS output shaped like `1 × predictions × 6` is also supported
+- Raw detection output shaped exactly `1 × 17 × 8400`
+- ONNX opset 17
 
-The input dimensions are read from model metadata. Dynamic dimensions fall back
-to `640 × 640`. Images are letterboxed, and detected boxes are restored to the
-original image coordinates.
+Images are letterboxed to `640 × 640`, converted to RGB NCHW Float32 tensors,
+and normalized to `0–1`. The output is parsed as four box values followed by 13
+class scores. Class-aware NMS is applied before boxes are restored to the original
+image coordinates.
 
 ## Class names
 
-Optionally add `public/models/classes.json` as a JSON array in model class order:
+`public/models/classes.json` records the required model class order:
 
 ```json
-["Medicine A", "Medicine B", "Medicine C"]
+["canagliflozin", "femara", "henformin", "januvia", "kombiglyze", "methimazole", "nolvadex", "onglyza", "oseni", "panbiotic", "qtern", "repaglinide", "trajenta"]
 ```
 
-Without this file, overlays use `Class 0`, `Class 1`, and so on. If the exported
-model includes a separate objectness score (YOLOv5-style output), pass
-`hasObjectness: true` to `runYoloInference`.
+The application also hard-codes and validates this order so a changed or missing
+JSON file cannot silently relabel detections. This export does not include a
+separate objectness score.
 
-The current UI is explicitly in Demo Mode and does not invoke this pipeline.
-Its disposal recommendation, return plan, collection unlock, and quiz use one
-fixed, clearly labeled demonstration case until the model and class-to-guidance
-mapping have been validated.
+The UI invokes this pipeline directly. Results are medicine-name candidates only;
+they do not produce diagnosis, treatment, dosing, or other medical inferences.

@@ -1,8 +1,23 @@
 import * as ort from 'onnxruntime-web/webgpu'
 
 const MODEL_URL = '/models/best.onnx'
-const LABELS_URL = '/models/classes.json'
 const DEFAULT_INPUT_SIZE = 640
+
+export const MEDICYCLE_CLASS_NAMES = [
+  'canagliflozin',
+  'femara',
+  'henformin',
+  'januvia',
+  'kombiglyze',
+  'methimazole',
+  'nolvadex',
+  'onglyza',
+  'oseni',
+  'panbiotic',
+  'qtern',
+  'repaglinide',
+  'trajenta',
+] as const
 
 export type InferenceStage = 'loading-model' | 'preprocessing' | 'running'
 export type InferenceBackend = 'webgpu' | 'wasm'
@@ -73,19 +88,6 @@ async function fetchModelBytes() {
   return response.arrayBuffer()
 }
 
-async function fetchLabels() {
-  try {
-    const response = await fetch(LABELS_URL)
-    if (!response.ok) return []
-    const value: unknown = await response.json()
-    return Array.isArray(value) && value.every((item) => typeof item === 'string')
-      ? value
-      : []
-  } catch {
-    return []
-  }
-}
-
 async function createSession(
   modelBytes: ArrayBuffer,
   backend: InferenceBackend,
@@ -101,7 +103,8 @@ async function loadModel(): Promise<LoadedModel> {
 
   const loadPromise: Promise<LoadedModel> = (async (): Promise<LoadedModel> => {
     ort.env.logLevel = 'warning'
-    const [modelBytes, labels] = await Promise.all([fetchModelBytes(), fetchLabels()])
+    const modelBytes = await fetchModelBytes()
+    const labels = [...MEDICYCLE_CLASS_NAMES]
 
     if ('gpu' in navigator) {
       try {
@@ -137,6 +140,24 @@ function getInputSize(session: ort.InferenceSession) {
     ? shape[3]
     : DEFAULT_INPUT_SIZE
   return { width, height }
+}
+
+function assertInputContract(session: ort.InferenceSession) {
+  const metadata = session.inputMetadata[0]
+  if (!metadata?.isTensor) {
+    throw new Error('The model input is not a tensor.')
+  }
+  const shape = metadata.shape
+  const staticShape = shape.every((dimension) => typeof dimension === 'number')
+  if (staticShape && (
+    shape.length !== 4 ||
+    shape[0] !== 1 ||
+    shape[1] !== 3 ||
+    shape[2] !== DEFAULT_INPUT_SIZE ||
+    shape[3] !== DEFAULT_INPUT_SIZE
+  )) {
+    throw new Error(`Unexpected model input shape: ${shape.join(' × ')}. Expected 1 × 3 × 640 × 640.`)
+  }
 }
 
 async function decodeImage(file: File) {
@@ -254,6 +275,9 @@ function parseRawOutput(
   const classCount = columns - scoreStart
   if (rows <= 0 || classCount <= 0) {
     throw new Error(`Unsupported YOLO output shape: ${dimensions.join(' × ')}`)
+  }
+  if (classCount !== labels.length) {
+    throw new Error(`Model has ${classCount} classes, but MediCycle requires ${labels.length}.`)
   }
 
   const candidates: Candidate[] = []
@@ -399,8 +423,13 @@ async function parseOutput(
     throw new Error(`Unsupported YOLO output type: ${tensor.type}. Expected float32.`)
   }
   const dimensions = tensor.dims
-  if (dimensions.length < 2) {
-    throw new Error(`Unsupported YOLO output shape: ${dimensions.join(' × ')}`)
+  if (
+    dimensions.length !== 3 ||
+    dimensions[0] !== 1 ||
+    dimensions[1] !== 4 + MEDICYCLE_CLASS_NAMES.length ||
+    dimensions[2] !== 8400
+  ) {
+    throw new Error(`Unexpected YOLO11 output shape: ${dimensions.join(' × ')}. Expected 1 × 17 × 8400.`)
   }
   const data = await tensor.getData()
   if (!(data instanceof Float32Array)) {
@@ -428,6 +457,7 @@ export async function runYoloInference(
 ): Promise<YoloInferenceResult> {
   options.onStage?.('loading-model')
   const loaded = await loadModel()
+  assertInputContract(loaded.session)
   const inputSize = getInputSize(loaded.session)
 
   options.onStage?.('preprocessing')

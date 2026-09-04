@@ -22,7 +22,7 @@ import {
   fallbackPharmacies,
   marineCards,
   marineFacts,
-  fixedDemoCase,
+  medicationReturnGuidance,
   pageHash,
   type AnalysisResult,
   type Coordinates,
@@ -43,6 +43,14 @@ import {
   type MediCycleProgress,
 } from './progress'
 import { useI18n } from './i18n'
+import {
+  MEDICYCLE_CLASS_NAMES,
+  ModelUnavailableError,
+  runYoloInference,
+  type Detection,
+  type InferenceBackend,
+  type InferenceStage,
+} from './inference/yolo'
 
 const PHARMACY_API_TIMEOUT_MS = 40_000
 
@@ -63,6 +71,21 @@ type CameraState =
   | 'permission-denied'
   | 'unavailable'
 
+type InferenceStatus =
+  | 'idle'
+  | InferenceStage
+  | 'success'
+  | 'unreliable'
+  | 'model-error'
+  | 'inference-error'
+
+type Prediction = {
+  label: string
+  confidence: number
+  backend: InferenceBackend
+  inferenceMs: number
+}
+
 function App() {
   const { t, language } = useI18n()
   const cameraVideoRef = useRef<HTMLVideoElement>(null)
@@ -81,6 +104,9 @@ function App() {
   const [cameraState, setCameraState] = useState<CameraState>('idle')
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [inferenceStatus, setInferenceStatus] = useState<InferenceStatus>('idle')
+  const [detections, setDetections] = useState<Detection[]>([])
+  const [prediction, setPrediction] = useState<Prediction | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [locatorState, setLocatorState] = useState<LocatorState>('idle')
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
@@ -304,6 +330,9 @@ function App() {
     setSelectedPharmacyId(null)
     setSearchRadiusKm(null)
     setReturnPlanConfirmed(false)
+    setInferenceStatus('idle')
+    setDetections([])
+    setPrediction(null)
   }
 
   const acceptFile = (selected: File | undefined, source: 'camera' | 'upload') => {
@@ -372,17 +401,64 @@ function App() {
     if (uploadRef.current) uploadRef.current.value = ''
   }
 
-  const openFixedDemoCase = async () => {
+  const analyzeMedicine = async () => {
+    if (!file) {
+      showToast(t('selectPhotoFirst'))
+      return
+    }
     stopCamera()
     setSessionEnded(false)
     setIsAnalyzing(true)
-    await new Promise((resolve) => window.setTimeout(resolve, 450))
-    const demoResult = { ...fixedDemoCase, steps: [...fixedDemoCase.steps] }
-    setResult(demoResult)
-    setRecycledForResult(false)
-    setIsAnalyzing(false)
-    window.history.pushState({ page: 'result' }, '', pageHash.result)
-    setPage('result')
+    setResult(null)
+    setDetections([])
+    setPrediction(null)
+    let currentStage: InferenceStage = 'loading-model'
+    setInferenceStatus(currentStage)
+
+    try {
+      const inference = await runYoloInference(file, {
+        labels: [...MEDICYCLE_CLASS_NAMES],
+        confidenceThreshold: 0.25,
+        iouThreshold: 0.45,
+        maxDetections: 100,
+        hasObjectness: false,
+        onStage: (stage) => {
+          currentStage = stage
+          setInferenceStatus(stage)
+        },
+      })
+      const topDetection = inference.detections[0]
+      setDetections(inference.detections)
+      if (!topDetection || topDetection.confidence < 0.5) {
+        setInferenceStatus('unreliable')
+        return
+      }
+
+      setPrediction({
+        label: topDetection.label,
+        confidence: topDetection.confidence,
+        backend: inference.backend,
+        inferenceMs: inference.inferenceMs,
+      })
+      setResult({
+        ...medicationReturnGuidance,
+        drugName: topDetection.label,
+        steps: [...medicationReturnGuidance.steps],
+      })
+      setRecycledForResult(false)
+      setInferenceStatus('success')
+      window.history.pushState({ page: 'result' }, '', pageHash.result)
+      setPage('result')
+    } catch (error) {
+      console.error('Medicine inference failed.', error)
+      setInferenceStatus(
+        error instanceof ModelUnavailableError || currentStage === 'loading-model'
+          ? 'model-error'
+          : 'inference-error',
+      )
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   const showFallbackLocation = (lat = 24.1795, lon = 120.6465) => {
@@ -718,7 +794,7 @@ function App() {
           <HeroArtwork onScan={() => goToSection('scan')} />
 
           <section className="value-strip" aria-label="Product value">
-            <div><span>1</span><p><b>{t('fixedCase')}</b><small>{t('fixedCaseText')}</small></p></div>
+            <div><span>AI</span><p><b>{t('fixedCase')}</b><small>{t('fixedCaseText')}</small></p></div>
             <div><span>LOCAL</span><p><b>{t('privatePreview')}</b><small>{t('privatePreviewText')}</small></p></div>
             <div><span>4</span><p><b>{t('guidedSteps')}</b><small>{t('guidedStepsText')}</small></p></div>
             <div><span>6</span><p><b>{t('marineStories')}</b><small>{t('marineStoriesText')}</small></p></div>
@@ -741,7 +817,7 @@ function App() {
 
             <div className="upload-panel">
               <div className="upload-panel-head">
-                <div><span className="status-dot" aria-hidden="true" /> DEMO MODE · PREVIEW ONLY</div>
+                <div><span className="status-dot" aria-hidden="true" /> {t('browserInference')}</div>
                 <small>JPG · PNG · HEIC · MAX 10 MB</small>
               </div>
               <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/heic,image/heif" hidden onChange={selectFile('upload')} />
@@ -769,7 +845,7 @@ function App() {
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={dropFile}
               >
-                {preview ? <DetectionPreview src={preview} alt="Selected medicine preview" detections={[]} /> : (
+                {preview ? <DetectionPreview src={preview} alt={t('selectedMedicinePreview')} detections={detections} /> : (
                   <div className="upload-empty">
                     <span aria-hidden="true">+</span>
                     <p>{t('photoPreview')}</p>
@@ -783,10 +859,34 @@ function App() {
                   <button type="button" className="text-button" onClick={removeFile}>{t('cancel')}</button>
                 </div>
               )}
-              <button type="button" className="figma-button black analyze-button" onClick={openFixedDemoCase} disabled={isAnalyzing}>
+              {inferenceStatus !== 'idle' && (() => {
+                const copy = inferenceStatus === 'loading-model'
+                  ? [t('modelLoading'), t('modelLoadingDetail')]
+                  : inferenceStatus === 'preprocessing'
+                    ? [t('preparingImage'), t('preparingImageDetail')]
+                    : inferenceStatus === 'running'
+                      ? [t('inferenceRunning'), t('inferenceRunningDetail')]
+                      : inferenceStatus === 'success'
+                        ? [t('inferenceComplete'), t('inferenceCompleteDetail')]
+                        : inferenceStatus === 'unreliable'
+                          ? [t('unableReliable'), t('retakeRequest')]
+                          : inferenceStatus === 'model-error'
+                            ? [t('modelLoadFailed'), t('modelLoadFailedDetail')]
+                            : [t('inferenceFailed'), t('inferenceFailedDetail')]
+                return (
+                  <div
+                    className={`inference-status is-${inferenceStatus}`}
+                    role={inferenceStatus === 'model-error' || inferenceStatus === 'inference-error' ? 'alert' : 'status'}
+                  >
+                    <span aria-hidden="true" />
+                    <p><b>{copy[0]}</b><small>{copy[1]}</small></p>
+                  </div>
+                )
+              })()}
+              <button type="button" className="figma-button black analyze-button" onClick={analyzeMedicine} disabled={isAnalyzing || !file}>
                 {isAnalyzing ? <><span className="spinner" aria-hidden="true" /> {t('openingDemo')}</> : t('continueDemo')}
               </button>
-              <p className="privacy-note">Demo Mode: photos are previewed locally, are not uploaded or stored, and do not affect the fixed result.</p>
+              <p className="privacy-note">{t('inferencePrivacy')}</p>
             </div>
           </section>
 
@@ -842,16 +942,21 @@ function App() {
           <ProcessSteps active={recycledForResult ? 4 : returnPlanConfirmed ? 2 : 1} />
           <section className="result-hero" aria-live="polite">
             <div className="result-image">
-              {preview ? <DetectionPreview src={preview} alt="User-selected preview, not analyzed" detections={[]} /> : (
-                <div className="demo-case-card"><span>{t('fixedDemonstration')}</span><b>Ethinyl Estradiol<br />0.03 mg</b><small>{t('noPhotoId')}</small></div>
-              )}
-              {preview && <div className="preview-disclaimer">PREVIEW ONLY · THIS PHOTO WAS NOT ANALYZED</div>}
+              {preview && <DetectionPreview src={preview} alt={t('analyzedMedicinePreview')} detections={detections} />}
+              {preview && <div className="preview-disclaimer">{t('detectionOverlay')}</div>}
             </div>
             <div className="result-summary">
-              <p className="eyebrow">{t('resultEyebrow')}</p>
-              <h1>{result.drugName}</h1><p className="category-line">{language === 'zh-TW' ? t('resultCategory') : result.category}</p>
+              <p className="eyebrow">{prediction && prediction.confidence >= 0.7 ? t('likelyMatch') : t('possibleMatch')}</p>
+              <h1>{result.drugName}</h1><p className="category-line">{t('resultCategory')}</p>
+              {prediction && (
+                <div className="confidence-meter">
+                  <div><span>{t('confidence')}</span><b>{(prediction.confidence * 100).toFixed(1)}%</b></div>
+                  <i aria-hidden="true"><span style={{ width: `${prediction.confidence * 100}%` }} /></i>
+                  <small>{t('inferenceBackend', { backend: prediction.backend.toUpperCase(), ms: Math.round(prediction.inferenceMs) })}</small>
+                </div>
+              )}
               <div className={`action-badge ${result.action}`}><span aria-hidden="true">{result.action === 'return' ? '↗' : '✓'}</span>{t('returnProfessional')}</div>
-              <div className="demo-result-notice"><b>Demo Mode</b><span>{t('resultNotice')}</span></div>
+              <div className="demo-result-notice"><b>{t('candidateOnly')}</b><span>{t('resultNotice')}</span></div>
               <p className="medical-disclaimer">{t('medicalDisclaimer')}</p>
             </div>
           </section>
