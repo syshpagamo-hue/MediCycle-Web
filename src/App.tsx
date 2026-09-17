@@ -560,7 +560,7 @@ function App() {
   }
 
   const markAsRecycled = () => {
-    if (recycledForResult || !returnPlanConfirmed) return
+    if (recycledForResult) return
     const next = Math.min(recycledCount + 1, marineCards.length)
     const unlocked = marineCards
       .slice(0, next)
@@ -1014,19 +1014,20 @@ function App() {
             <SectionHeading eyebrow={t('disposalEyebrow')} title={t('disposalTitle')} text={language === 'zh-TW' ? t('disposalReason') : result.reason} />
             <ol>{(language === 'zh-TW' ? [t('disposalStep1'), t('disposalStep2'), t('disposalStep3')] : result.steps).map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, '0')}</span><p>{step}</p></li>)}</ol>
           </section>
-          {pharmacySection}
 
           <div className="result-action-panel">
-            <div><p className="eyebrow">{t('completionEyebrow')}</p><h2>{recycledForResult ? t('completionDone') : returnPlanConfirmed ? t('completionReady') : t('completionFind')}</h2></div>
+            <div><p className="eyebrow">{t('completionEyebrow')}</p><h2>{recycledForResult ? t('completionDone') : t('completionReady')}</h2></div>
             <button
               type="button"
               className={`figma-button blue${recycledForResult ? ' completed' : ''}`}
-              onClick={() => returnPlanConfirmed ? markAsRecycled() : document.getElementById('nearest-pharmacy')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={markAsRecycled}
               aria-disabled={recycledForResult}
             >
-              {recycledForResult ? t('marineUnlocked') : returnPlanConfirmed ? t('simulateUnlock') : t('findPlan')}
+              {recycledForResult ? t('marineUnlocked') : t('simulateUnlock')}
             </button>
           </div>
+
+          {pharmacySection}
 
           {recycledForResult && (
             <Quiz

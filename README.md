@@ -24,7 +24,7 @@ Nearby Pharmacy uses browser geolocation and a same-origin Cloudflare Pages Func
 
 ### Fish / Ocean collection
 
-Planning a return and recording the guided hand-off unlocks marine-life cards. My Ocean turns the environmental consequence of a small household action into visible, persistent progress.
+Reviewing the core disposal education unlocks marine-life cards directly; geolocation, pharmacy search, and return-plan creation are optional. My Ocean turns the environmental consequence of a small household action into visible, persistent progress.
 
 ![MediCycle Marine Life collection experience](public/readme/marine-collection.png)
 
@@ -34,7 +34,7 @@ Planning a return and recording the guided hand-off unlocks marine-life cards. M
 - **Camera and upload** — supports camera capture, file selection, drag-and-drop, local preview, file-type validation, and a 10 MB size limit. Selected images are analyzed locally and are not uploaded or stored by MediCycle.
 - **AI medication-name candidates** — decodes the image, letterboxes it to `640 × 640`, creates an RGB NCHW Float32 tensor normalized to `0–1`, parses the `1 × 17 × 8400` YOLO11 output, applies confidence filtering and class-aware NMS, restores boxes to original image coordinates, and draws the detections.
 - **Bilingual product** — the full interface, recognition guidance, pharmacy flow, return plan, collection, and Quiz are available in English and Traditional Chinese.
-- **Disposal and return plan** — explains why responsible disposal matters, helps the user choose a pharmacy to contact, records a return option, and guides the simulated hand-off.
+- **Disposal education and optional return plan** — explains why responsible disposal matters and unlocks the collection after the core education; users may optionally find and contact a pharmacy or record a return option.
 - **Nearby pharmacies** — sends browser geolocation to a same-origin Cloudflare Pages Function, which validates coordinates and queries multiple OpenStreetMap Overpass providers before returning normalized nearest-first results to the Leaflet map.
 - **Marine Life collection** — rewards simulated completion with six unlockable species cards and environmental impact stories.
 - **Six-question Quiz** — checks pharmaceutical-pollution, disposal, aquatic-impact, and AI-role knowledge. Every submitted answer includes a bilingual detailed explanation, why the correct option is right, why the other options do not fit, and clickable sources from organizations and research databases such as the US EPA, FDA, USGS, and PubMed.
@@ -46,9 +46,9 @@ Planning a return and recording the guided hand-off unlocks marine-life cards. M
 1. Take a medicine photo or upload an image from the device.
 2. Analyze the image locally in the browser.
 3. Review the medicine-name candidate, confidence, bounding boxes, and general disposal guidance.
-4. Find nearby pharmacies through a live OpenStreetMap search or use the clearly labeled sample locations.
-5. Select a pharmacy to contact, then plan and simulate completion of the medication hand-off.
-6. Unlock a Marine Life card and save collection progress on the device.
+4. Review the essential disposal guidance and unlock a Marine Life card immediately.
+5. Optionally find nearby pharmacies through a live OpenStreetMap search or use the clearly labeled sample locations.
+6. Optionally record a pharmacy contact plan; collection progress is saved on the device regardless.
 7. Complete the Quiz to connect responsible disposal with its potential effect on aquatic ecosystems.
 
 ## Technical Architecture
@@ -59,10 +59,11 @@ flowchart LR
     B --> C[ONNX Runtime Web<br/>WebGPU → WASM]
     C --> D[YOLO11n ONNX<br/>13 medicine classes]
     D --> E[Candidate + confidence<br/>general disposal guidance]
-    E --> F[Cloudflare Pages Function]
+    E --> H[Core disposal education<br/>direct unlock]
+    E -. Optional pharmacy search .-> F[Cloudflare Pages Function]
     F --> L[OpenStreetMap Overpass<br/>multi-endpoint fallback]
     L --> G[Leaflet / react-leaflet]
-    G --> H[Return plan + simulated completion]
+    G -. Optional contact plan .-> I
     H --> I[Marine Life collection + Quiz]
     I --> J[localStorage fallback]
     I --> M[Prototype account API]
